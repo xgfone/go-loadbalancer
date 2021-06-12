@@ -75,7 +75,7 @@ func (c *HTTPEndpointHealthChecker) Check(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	} else if len(c.Info.Header) > 0 {
-		req.Header = c.Info.Header.Clone()
+		req.Header = cloneHTTPHeader(c.Info.Header)
 	}
 	if c.Info.Host != "" {
 		req.Host = c.Info.Host
@@ -104,4 +104,26 @@ func (c *HTTPEndpointHealthChecker) Check(ctx context.Context) (err error) {
 	}
 
 	return fmt.Errorf("unexpected status code '%d'", resp.StatusCode)
+}
+
+// cloneHTTPHeader is copied from the method net/http.Header#Clone.
+func cloneHTTPHeader(h http.Header) http.Header {
+	if h == nil {
+		return nil
+	}
+
+	// Find total number of values.
+	nv := 0
+	for _, vv := range h {
+		nv += len(vv)
+	}
+	sv := make([]string, nv) // shared backing array for headers' values
+	h2 := make(http.Header, len(h))
+	for k, vv := range h {
+		n := copy(sv, vv)
+		h2[k] = sv[:n:n]
+		sv = sv[n:]
+	}
+
+	return h2
 }
