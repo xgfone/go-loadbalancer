@@ -110,7 +110,7 @@ type HTTPEndpointConfig struct {
 	// Handler is used to allow the user to customize the http request.
 	//
 	// Default: client.Do(httpReq)
-	Handler func(origReq Request, client *http.Client, httpReq *http.Request) (*http.Response, error)
+	Handler func(serverID string, client *http.Client, httpReq *http.Request, origReq Request) (*http.Response, error)
 }
 
 func (c *HTTPEndpointConfig) init(addr string) (hostport string, err error) {
@@ -232,13 +232,18 @@ func (e *httpEndpoint) RoundTrip(c context.Context, r Request) (interface{}, err
 	var err error
 	var resp *http.Response
 	if e.conf.Handler == nil {
-		resp, err = e.conf.Client.Do(req)
+		resp, err = e.defaultHandler(e.conf.ServerID, e.conf.Client, req, r)
 	} else {
-		resp, err = e.conf.Handler(r, e.conf.Client, req)
+		resp, err = e.conf.Handler(e.conf.ServerID, e.conf.Client, req, r)
 	}
 
-	if resp != nil {
-		resp.Header.Set("X-Server-Id", e.conf.ServerID)
-	}
 	return resp, err
+}
+
+func (e *httpEndpoint) defaultHandler(serverID string, client *http.Client,
+	hreq *http.Request, req Request) (resp *http.Response, err error) {
+	if resp, err = e.conf.Client.Do(hreq); err == nil && serverID != "" {
+		resp.Header.Set("X-Server-Id", serverID)
+	}
+	return
 }
