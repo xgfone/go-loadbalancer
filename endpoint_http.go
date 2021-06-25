@@ -16,7 +16,7 @@ package loadbalancer
 
 import (
 	"context"
-	"encoding/hex"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
@@ -87,7 +87,7 @@ func (i HTTPEndpointInfo) Validate() error {
 type HTTPEndpointConfig struct {
 	// ServerID is set the response header "X-Server-Id".
 	//
-	// Default: hex.EncodeToString([]byte(addr)).
+	// Default: base64.StdEncoding.EncodeToString([]byte(addr))
 	ServerID string
 
 	// Info is the additional optional information of the endpoint
@@ -139,7 +139,7 @@ func (c *HTTPEndpointConfig) init(addr string) (hostport string, err error) {
 	}
 
 	if c.ServerID == "" {
-		c.ServerID = hex.EncodeToString([]byte(hostport))
+		c.ServerID = base64.StdEncoding.EncodeToString([]byte(hostport))
 	}
 
 	return
