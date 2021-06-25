@@ -43,6 +43,12 @@ type EndpointCheckerInfo struct {
 	Healthy  bool
 }
 
+// EndpointCheckerFunc is the function implementing the interface EndpointChecker.
+type EndpointCheckerFunc func(context.Context) error
+
+// Check implements the interface EndpointChecker.
+func (f EndpointCheckerFunc) Check(c context.Context) error { return f(c) }
+
 type healthChecker struct {
 	Endpoint
 
