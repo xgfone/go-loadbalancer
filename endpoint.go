@@ -66,8 +66,9 @@ type Endpoint interface {
 
 // EndpointUpdater is used to add or delete the endpoint.
 type EndpointUpdater interface {
-	AddEndpoint(Endpoint)
+	DelEndpointByID(id string)
 	DelEndpoint(Endpoint)
+	AddEndpoint(Endpoint)
 }
 
 // EndpointBatchUpdater is used to add or delete the endpoints in bulk.

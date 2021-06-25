@@ -110,8 +110,12 @@ func (p *generalProvider) AddEndpoint(endpoint Endpoint) {
 }
 
 func (p *generalProvider) DelEndpoint(endpoint Endpoint) {
+	p.DelEndpointByID(endpoint.ID())
+}
+
+func (p *generalProvider) DelEndpointByID(id string) {
 	p.lock.Lock()
-	p.delEndpointByID(endpoint.ID())
+	p.delEndpointByID(id)
 	p.lock.Unlock()
 }
 

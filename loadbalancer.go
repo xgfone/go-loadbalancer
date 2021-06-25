@@ -94,6 +94,11 @@ func (lb *LoadBalancer) DelEndpoint(ep Endpoint) {
 	lb.Provider.(EndpointUpdater).DelEndpoint(ep)
 }
 
+// DelEndpointByID implements the interface EndpointUpdater.
+func (lb *LoadBalancer) DelEndpointByID(epid string) {
+	lb.Provider.(EndpointUpdater).DelEndpointByID(epid)
+}
+
 // AddEndpoints implements the interface EndpointBatchUpdater.
 func (lb *LoadBalancer) AddEndpoints(eps []Endpoint) {
 	lb.Provider.(EndpointBatchUpdater).AddEndpoints(eps)
