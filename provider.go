@@ -72,7 +72,7 @@ func (p *generalProvider) String() string {
 
 func (p *generalProvider) Strategy() string {
 	p.lock.RLock()
-	name := p.selector.String()
+	name := p.selector.Name()
 	p.lock.RUnlock()
 	return name
 }
@@ -162,7 +162,7 @@ func (p *generalProvider) SetSelector(selector Selector) {
 	}
 
 	p.lock.Lock()
-	if p.selector.String() != selector.String() {
+	if p.selector.Name() != selector.Name() {
 		p.selector = selector
 	}
 	p.lock.Unlock()

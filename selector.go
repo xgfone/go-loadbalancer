@@ -39,7 +39,7 @@ func init() {
 // weight", "source_ip" and "least_connections". So you can use the function
 // GetSelector to get them.
 func RegisterSelector(selector Selector) {
-	name := selector.String()
+	name := selector.Name()
 	if _, ok := selectors[name]; ok {
 		panic(fmt.Errorf("the policy selector named '%s' has been registered", name))
 	}
@@ -74,8 +74,8 @@ type SelectorGetSetter interface {
 
 // Selector is used to to select the active endpoint to be used.
 type Selector interface {
-	// String returns the name of the selector.
-	String() string
+	// Name returns the name of the selector.
+	Name() string
 
 	// Select returns the selected endpoint from endpoints by the request
 	// to forward the request.
@@ -87,7 +87,9 @@ type selector struct {
 	selector func(Request, Endpoints) Endpoint
 }
 
-func (s selector) String() string                            { return s.name }
+func (s selector) String() string { return fmt.Sprintf("Selector(name=%s)", s.name) }
+
+func (s selector) Name() string                              { return s.name }
 func (s selector) Select(r Request, eps []Endpoint) Endpoint { return s.selector(r, eps) }
 
 // SelectorFunc returns a new Selector with the name and the selector.
