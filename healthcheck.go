@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -48,6 +49,19 @@ type EndpointCheckerFunc func(context.Context) error
 
 // Check implements the interface EndpointChecker.
 func (f EndpointCheckerFunc) Check(c context.Context) error { return f(c) }
+
+// NewEndpointPortChecker returns the endpoint checker to retry to connect
+// to the endpoint with TCP.
+func NewEndpointPortChecker(addr string) EndpointChecker {
+	return EndpointCheckerFunc(func(c context.Context) (err error) {
+		var dial net.Dialer
+		conn, err := dial.DialContext(c, "tcp", addr)
+		if err == nil {
+			conn.Close()
+		}
+		return
+	})
+}
 
 type healthChecker struct {
 	Endpoint
