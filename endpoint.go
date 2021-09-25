@@ -80,6 +80,7 @@ type EndpointBatchUpdater interface {
 // Endpoints is a set of Endpoint.
 type Endpoints []Endpoint
 
+// Sort sorts the endpoints.
 func (es Endpoints) Sort()              { sort.Stable(es) }
 func (es Endpoints) Len() int           { return len(es) }
 func (es Endpoints) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }

@@ -326,7 +326,7 @@ func (hc *HealthCheck) SetEndpointChecker(epid string, checker EndpointChecker,
 // DelEndpoint is equal to DelEndpointByID(ep.ID())
 func (hc *HealthCheck) DelEndpoint(ep Endpoint) { hc.DelEndpointByID(ep.ID()) }
 
-// DelEndpoint deletes the endpoint by the id.
+// DelEndpointByID deletes the endpoint by the id.
 //
 // If the endpoint does not exist, do nothing.
 func (hc *HealthCheck) DelEndpointByID(endpointID string) {

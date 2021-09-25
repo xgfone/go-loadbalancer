@@ -30,6 +30,7 @@ type HTTPStatusCodeRange struct {
 	End   int `json:"end" xml:"end"`
 }
 
+// HTTPEndpointHealthChecker is the health checker of the http endpoint.
 type HTTPEndpointHealthChecker struct {
 	// Addr is the address to dial.
 	Addr string
@@ -51,10 +52,12 @@ type HTTPEndpointHealthChecker struct {
 
 var _ EndpointChecker = &HTTPEndpointHealthChecker{}
 
+// NewHTTPEndpointHealthChecker returns a new HTTPEndpointHealthChecker.
 func NewHTTPEndpointHealthChecker(addr string) *HTTPEndpointHealthChecker {
 	return &HTTPEndpointHealthChecker{Addr: addr}
 }
 
+// Check implements the interface EndpointChecker.
 func (c *HTTPEndpointHealthChecker) Check(ctx context.Context) (err error) {
 	url := url.URL{
 		Scheme:   c.Info.Scheme,

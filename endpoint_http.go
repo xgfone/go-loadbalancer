@@ -54,6 +54,7 @@ func (r HTTPRequest) RemoteAddrString() string { return r.req.RemoteAddr }
 // Request returns the inner http.Request.
 func (r HTTPRequest) Request() *http.Request { return r.req }
 
+// HTTPEndpointInfo is the information of the HTTP endpoint.
 type HTTPEndpointInfo struct {
 	Method string      `json:"method,omitempty" xml:"method,omitempty"`
 	Scheme string      `json:"scheme,omitempty" xml:"scheme,omitempty"`
