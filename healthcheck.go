@@ -220,10 +220,10 @@ func (hc *HealthCheck) DelUpdater(name string) (updater EndpointUpdater) {
 	return
 }
 
-// GetUpdaterr returns the updater named name.
+// GetUpdater returns the updater named name.
 //
 // If the updater does not exist, return nil.
-func (hc *HealthCheck) GetUpdaterr(name string) (updater EndpointUpdater) {
+func (hc *HealthCheck) GetUpdater(name string) (updater EndpointUpdater) {
 	hc.uplock.RLock()
 	updater = hc.updaters[name]
 	hc.uplock.RUnlock()
