@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"net/netip"
 
+	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/internal/random"
 )
@@ -28,8 +29,8 @@ import (
 type Balancer struct {
 	// GetSourceAddr is used to get the source address.
 	//
-	// If nil, use loadbalancer.GetRemoteAddr instead.
-	GetSourceAddr func(req interface{}) (netip.Addr, error)
+	// If nil, use defaults.GetRemoteAddr instead.
+	GetSourceAddr func(ctx context.Context, req interface{}) (netip.Addr, error)
 
 	policy string
 	random func(int) int
@@ -63,9 +64,9 @@ func (b *Balancer) Forward(c context.Context, r interface{}, sd loadbalancer.End
 	var err error
 	var sip netip.Addr
 	if b.GetSourceAddr == nil {
-		sip, err = loadbalancer.GetRemoteAddr(r)
+		sip, err = defaults.GetRemoteAddr(c, r)
 	} else {
-		sip, err = b.GetSourceAddr(r)
+		sip, err = b.GetSourceAddr(c, r)
 	}
 
 	if err != nil {

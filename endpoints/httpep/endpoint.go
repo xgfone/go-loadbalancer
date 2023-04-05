@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"sync/atomic"
 
+	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/internal/slog"
 )
@@ -195,7 +196,7 @@ func handleRequest(client *http.Client, req *http.Request) (*http.Response, erro
 	resp, err := client.Do(req)
 	if slog.Enabled(req.Context(), slog.LevelTrace) {
 		slog.Trace("forward the http request",
-			"requestid", loadbalancer.GetRequestID(req.Context(), req),
+			"requestid", defaults.GetRequestID(req.Context(), req),
 			"method", req.Method, "host", req.Host, "url", req.URL.String(),
 			"err", err)
 	}

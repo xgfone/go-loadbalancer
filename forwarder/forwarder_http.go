@@ -17,6 +17,7 @@ package forwarder
 import (
 	"net/http"
 
+	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/endpoints/httpep"
 	"github.com/xgfone/go-loadbalancer/internal/nets"
@@ -43,7 +44,7 @@ func handleHTTPError(f *Forwarder, w http.ResponseWriter, r *http.Request, err e
 	case nil:
 		if slog.Enabled(r.Context(), slog.LevelDebug) {
 			slog.Debug("forward the http request",
-				"requestid", loadbalancer.GetRequestID(r.Context(), r),
+				"requestid", defaults.GetRequestID(r.Context(), r),
 				"forwarder", f.name,
 				"balancer", f.GetBalancer().Policy(),
 				"clientaddr", r.RemoteAddr,
@@ -65,7 +66,7 @@ func handleHTTPError(f *Forwarder, w http.ResponseWriter, r *http.Request, err e
 	}
 
 	slog.Error("fail to forward the http request",
-		"requestid", loadbalancer.GetRequestID(r.Context(), r),
+		"requestid", defaults.GetRequestID(r.Context(), r),
 		"forwarder", f.name,
 		"balancer", f.GetBalancer().Policy(),
 		"clientaddr", r.RemoteAddr,
