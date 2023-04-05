@@ -12,5 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package loadbalancer provides a common loadbalancer.
-package loadbalancer
+// Package nets provides some net assistant functions.
+package nets
+
+import "errors"
+
+type timeoutError interface {
+	Timeout() bool // Is the error a timeout?
+	error
+}
+
+// IsTimeout reports whether the error is timeout.
+func IsTimeout(err error) bool {
+	var timeoutErr timeoutError
+	return errors.As(err, &timeoutErr) && timeoutErr.Timeout()
+}

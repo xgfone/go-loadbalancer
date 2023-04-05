@@ -1,137 +1,140 @@
-# LoadBalancer [![Build Status](https://github.com/xgfone/go-loadbalancer/actions/workflows/go.yml/badge.svg)](https://github.com/xgfone/go-loadbalancer/actions/workflows/go.yml) [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/go-loadbalancer)](https://pkg.go.dev/github.com/xgfone/go-loadbalancer) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/go-loadbalancer/master/LICENSE)
+# Go LoadBalancer [![Build Status](https://github.com/xgfone/go-loadbalancer/actions/workflows/go.yml/badge.svg)](https://github.com/xgfone/go-loadbalancer/actions/workflows/go.yml) [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/go-loadbalancer)](https://pkg.go.dev/github.com/xgfone/go-loadbalancer) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/go-loadbalancer/master/LICENSE)
 
-A set of the loadbalancer functions supporting `Go1.7+`.
 
-## Installation
+## Install
 ```shell
 $ go get -u github.com/xgfone/go-loadbalancer
 ```
 
 ## Example
 
-### `Client` Mode
+### Mini API Gateway
 ```go
 package main
 
 import (
-	"bytes"
-	"fmt"
-	"io"
+	"flag"
 	"net/http"
-	"time"
 
+	"github.com/xgfone/go-binder"
 	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/balancer"
+	"github.com/xgfone/go-loadbalancer/endpoints/httpep"
+	"github.com/xgfone/go-loadbalancer/forwarder"
+	"github.com/xgfone/go-loadbalancer/healthcheck"
 )
 
-func roundTripp(lb *loadbalancer.LoadBalancer, host string) http.RoundTripper {
-	return &loadbalancer.HTTPRoundTripper{
-		GetRoundTripper: func(r *http.Request) (rt loadbalancer.RoundTripper) {
-			if r.Host == host {
-				return lb
-			}
-			return nil
-		},
-	}
+var listenAddr = flag.String("listen-addr", ":80", "The address that api gateway listens on.")
+
+func main() {
+	flag.Parse()
+
+	healthcheck.DefaultHealthChecker.Start()
+	defer healthcheck.DefaultHealthChecker.Stop()
+
+	http.HandleFunc("/admin/route", registerRouteHandler)
+	http.ListenAndServe(*listenAddr, nil)
 }
 
-func printResponse(resp *http.Response, err error) {
-	if err != nil {
-		fmt.Println(err)
+func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 
-	fmt.Printf("URL: %s\n", resp.Request.URL.String())
+	var req struct {
+		Path     string `json:"path" validate:"required"`
+		Method   string `json:"method" validate:"required"`
+		Upstream struct {
+			ForwardPolicy string                  `json:"forwardPolicy" default:"weight_random"`
+			ForwardURL    httpep.URL              `json:"forwardUrl"`
+			HealthCheck   healthcheck.CheckConfig `json:"healthCheck"`
 
-	buf := bytes.NewBuffer(nil)
-	io.CopyN(buf, resp.Body, resp.ContentLength)
-	resp.Body.Close()
+			Servers []struct {
+				IP     string `json:"ip" validate:"ip"`
+				Port   uint16 `json:"port" validate:"ranger(1,65535)"`
+				Weight int    `json:"weight" default:"1" validate:"min(1)"`
+			} `json:"servers"`
+		} `json:"upstream"`
+	}
 
-	fmt.Println("StatusCode:", resp.StatusCode)
-	fmt.Println("Body:", buf.String())
-}
+	if err := binder.BodyDecoder.Decode(&req, r.Body); err != nil {
+		http.Error(w, "invalid request route paramenter: "+err.Error(), 400)
+		return
+	}
 
-func main() {
-	lb := loadbalancer.NewLoadBalancer("default", nil)
-	defer lb.Close()
+	// Build the upstream backend servers.
+	endpoints := make(loadbalancer.Endpoints, len(req.Upstream.Servers))
+	for i, server := range req.Upstream.Servers {
+		config := httpep.Config{URL: req.Upstream.ForwardURL}
+		config.StaticWeight = server.Weight
+		config.URL.Port = server.Port
+		config.URL.IP = server.IP
 
-	hc := loadbalancer.NewHealthCheck()
-	hc.AddUpdater(lb.Name(), lb)
-	defer hc.Stop()
-
-	http.DefaultClient.Transport = roundTripp(lb, "127.0.0.1:80")
-	ep1, _ := loadbalancer.NewHTTPEndpoint("192.168.1.1", nil)
-	ep2, _ := loadbalancer.NewHTTPEndpoint("192.168.1.2", nil)
-	ep3, _ := loadbalancer.NewHTTPEndpoint("192.168.1.3", nil)
-	duration := loadbalancer.EndpointCheckerDuration{Interval: time.Second * 10}
-	hc.AddEndpoint(ep1, loadbalancer.NewHTTPEndpointHealthChecker(ep1.ID()), duration)
-	hc.AddEndpoint(ep2, loadbalancer.NewHTTPEndpointHealthChecker(ep2.ID()), duration)
-	hc.AddEndpoint(ep3, loadbalancer.NewHTTPEndpointHealthChecker(ep3.ID()), duration)
-
-	// Wait to check the health status of all end endpoints.
-	time.Sleep(time.Second)
-
-	// 127.0.0.1:80 will be replaced with one of 192.168.1.1:80, 192.168.1.2:80, 192.168.1.3:80.
-	resp, err := http.Get("http://127.0.0.1:80")
-	printResponse(resp, err)
-
-	// 127.0.0.1:8000 won't be replaced, and it will send the request to 127.0.0.1:8000 directly.
-	resp, err = http.Get("http://127.0.0.1:8000")
-	printResponse(resp, err)
-}
-```
-
-### `Proxy` Mode
-```go
-package main
-
-import (
-	"context"
-	"io"
-	"net/http"
-	"time"
-
-	"github.com/xgfone/go-loadbalancer"
-)
-
-func proxyHandler(lb *loadbalancer.LoadBalancer) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: Add other headers
-		resp, err := lb.RoundTrip(context.Background(), loadbalancer.NewHTTPRequest(r, r.Header.Get("SessionID")))
+		endpoint, err := config.NewEndpoint()
 		if err != nil {
-			w.WriteHeader(502)
-			w.Write([]byte(err.Error()))
+			http.Error(w, "fail to build the upstream server: "+err.Error(), 400)
 			return
 		}
 
-		hresp := resp.(*http.Response)
-		for key, value := range hresp.Header {
-			w.Header()[key] = value
-		}
-		// TODO: Add and fix the response headers
+		endpoints[i] = endpoint
+	}
 
-		w.WriteHeader(hresp.StatusCode)
-		if hresp.ContentLength > 0 {
-			io.CopyBuffer(w, hresp.Body, make([]byte, 1024))
+	// Build the loadbalancer forwarder.
+	balancer, _ := balancer.Build(req.Upstream.ForwardPolicy, nil)
+	forwarder := forwarder.NewForwarder(req.Method+""+req.Path, balancer)
+
+	healthcheck.DefaultHealthChecker.AddUpdater(forwarder.Name(), forwarder)
+	healthcheck.DefaultHealthChecker.UpsertEndpoints(endpoints, req.Upstream.HealthCheck)
+
+	// Register the route and forward the request to forwarder.
+	http.HandleFunc(req.Path, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != req.Method {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		} else {
+			forwarder.ServeHTTP(w, r)
 		}
 	})
 }
+```
 
-func main() {
-	lb := loadbalancer.NewLoadBalancer("default", nil)
-	defer lb.Close()
+```shell
+# Run the mini API-Gateway on the host 192.168.1.10
+$ nohup go run main.go &
 
-	hc := loadbalancer.NewHealthCheck()
-	hc.AddUpdater(lb.Name(), lb)
-	defer hc.Stop()
+# Add the route
+# Notice: remove the characters from // to the line end.
+$ curl -XPOST http://127.0.0.1/admin/route -H 'Content-Type: application/json' -d '
+{
+    "rule": "Method(`GET`) && Path(`/path`)",
+    "upstream": {
+        "forwardPolicy": "weight_round_robin",
+        "forwardUrl" : {"path": "/backend/path"},
+        "servers": [
+            {"ip": "192.168.1.11", "port": 80, "weight": 10}, // 33.3% requests
+            {"ip": "192.168.1.12", "port": 80, "weight": 20}  // 66.7% requests
+        ]
+    }
+}'
 
-	ep1, _ := loadbalancer.NewHTTPEndpoint("192.168.1.1", nil)
-	ep2, _ := loadbalancer.NewHTTPEndpoint("192.168.1.2", nil)
-	ep3, _ := loadbalancer.NewHTTPEndpoint("192.168.1.3", nil)
-	duration := loadbalancer.EndpointCheckerDuration{Interval: time.Second * 10}
-	hc.AddEndpoint(ep1, loadbalancer.NewHTTPEndpointHealthChecker(ep1.ID()), duration)
-	hc.AddEndpoint(ep2, loadbalancer.NewHTTPEndpointHealthChecker(ep2.ID()), duration)
-	hc.AddEndpoint(ep3, loadbalancer.NewHTTPEndpointHealthChecker(ep3.ID()), duration)
+# Access the backend servers by the mini API-Gateway:
+# 2/6(33.3%) requests -> 192.168.1.11
+# 4/6(66.7%) requests -> 192.168.1.12
+$ curl http://192.168.1.10/path
+192.168.1.11/backend/path
 
-	http.ListenAndServe(":80", proxyHandler(lb))
-}
+$ curl http://192.168.1.10/path
+192.168.1.12/backend/path
+
+$ curl http://192.168.1.10/path
+192.168.1.12/backend/path
+
+$ curl http://192.168.1.10/path
+192.168.1.11/backend/path
+
+$ curl http://192.168.1.10/path
+192.168.1.12/backend/path
+
+$ curl http://192.168.1.10/path
+192.168.1.12/backend/path
 ```

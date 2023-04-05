@@ -1,4 +1,4 @@
-// Copyright 2021 xgfone
+// Copyright 2023 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,22 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build !go1.13
-
-package loadbalancer
+package random
 
 import (
-	"context"
-	"io"
-	"net/http"
+	"testing"
+
+	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
-// newHTTPRequestWithContext is the compatibility of http.NewRequestWithContext.
-func newHTTPRequestWithContext(ctx context.Context, method, url string,
-	body io.Reader) (*http.Request, error) {
-	req, err := http.NewRequest(method, url, body)
-	if err == nil {
-		req = req.WithContext(ctx)
-	}
-	return req, err
+func BenchmarkRandom(b *testing.B) {
+	tests.BenchBalancer(b, NewBalancer(""))
+}
+
+func BenchmarkWeightedRandom(b *testing.B) {
+	tests.BenchBalancer(b, NewWeightedBalancer(""))
 }

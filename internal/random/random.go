@@ -12,5 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package loadbalancer provides a common loadbalancer.
-package loadbalancer
+// Package random provides a random generation function.
+package random
+
+import (
+	"math/rand"
+	"sync"
+	"time"
+)
+
+// NewRandom returns a new function to generate the random number.
+func NewRandom() func(int) int {
+	lock := new(sync.Mutex)
+	random := rand.New(rand.NewSource(time.Now().UnixNano())).Intn
+	return func(i int) (n int) {
+		lock.Lock()
+		n = random(i)
+		lock.Unlock()
+		return
+	}
+}

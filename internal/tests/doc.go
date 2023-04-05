@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package loadbalancer provides a common loadbalancer.
-package loadbalancer
+// Package tests provides some test functions.
+package tests

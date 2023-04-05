@@ -12,5 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package loadbalancer provides a common loadbalancer.
-package loadbalancer
+package slog
+
+func ExampleSetDiscardWriter() {
+	SetDiscardWriter()
+	Trace("trace")
+	Debug("debug")
+	Error("error")
+
+	// Output:
+	//
+}

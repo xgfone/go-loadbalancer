@@ -1,4 +1,4 @@
-// Copyright 2021 xgfone
+// Copyright 2023 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,18 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build go1.15
+package nets
 
-package loadbalancer
+import (
+	"net"
+	"testing"
+	"time"
+)
 
-import "time"
-
-type ticker struct {
-	*time.Ticker
+func TestIsTimeout(t *testing.T) {
+	conn, err := net.DialTimeout("tcp4", "127.0.0.1:10000", time.Microsecond)
+	if conn != nil {
+		conn.Close()
+	}
+	if err == nil {
+		t.Fatal("expect an error, but got nil")
+	} else if !IsTimeout(err) {
+		t.Errorf("expect a timeout error, but got '%v'", err)
+	}
 }
-
-func newTicker(interval time.Duration) ticker {
-	return ticker{time.NewTicker(interval)}
-}
-
-func (t *ticker) TimeChan() <-chan time.Time { return t.Ticker.C }

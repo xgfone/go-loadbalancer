@@ -1,4 +1,4 @@
-// Copyright 2021 xgfone
+// Copyright 2023 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,47 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package loadbalancer
+package loadbalancer_test
 
 import (
-	"context"
-	"errors"
+	"sort"
+	"testing"
+
+	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
-var (
-	err1 = errors.New("error1")
-	err2 = errors.New("error2")
-)
+func TestEndpoints(t *testing.T) {
+	ep1 := tests.NewEndpoint("192.168.1.1", 1)
+	ep2 := tests.NewEndpoint("192.168.1.2", 1)
+	ep3 := tests.NewEndpoint("192.168.1.3", 3)
+	ep4 := tests.NewEndpoint("192.168.1.4", 3)
+	ep5 := tests.NewEndpoint("192.168.1.5", 2)
+	ep6 := tests.NewEndpoint("192.168.1.6", 2)
 
-type noopRequest string
+	eps := loadbalancer.Endpoints{ep1, ep2, ep3, ep4, ep5, ep6}
+	sort.Stable(eps)
 
-func newNoopRequest(addr string) Request       { return noopRequest(addr) }
-func (r noopRequest) RemoteAddrString() string { return string(r) }
-func (r noopRequest) SessionID() string        { return string(r) }
-
-type noopEndpoint struct{ name string }
-
-func newNoopEndpoint(name string) Endpoint               { return &noopEndpoint{name: name} }
-func (e *noopEndpoint) ID() string                       { return e.name }
-func (e *noopEndpoint) Type() string                     { return "noop" }
-func (e *noopEndpoint) State() (s EndpointState)         { return }
-func (e *noopEndpoint) MetaData() map[string]interface{} { return nil }
-func (e *noopEndpoint) RoundTrip(context.Context, Request) (interface{}, error) {
-	return nil, nil
-}
-
-type errEndpoint struct {
-	name string
-	err  error
-}
-
-func newErrorEndpoint(name string, err error) Endpoint {
-	return &errEndpoint{name: name, err: err}
-}
-func (e *errEndpoint) ID() string                       { return e.name }
-func (e *errEndpoint) Type() string                     { return "error" }
-func (e *errEndpoint) State() (s EndpointState)         { return }
-func (e *errEndpoint) MetaData() map[string]interface{} { return nil }
-func (e *errEndpoint) RoundTrip(context.Context, Request) (interface{}, error) {
-	return nil, e.err
+	expects := []string{
+		"192.168.1.1", "192.168.1.2",
+		"192.168.1.5", "192.168.1.6",
+		"192.168.1.3", "192.168.1.4",
+	}
+	for i, ep := range eps {
+		if id := ep.ID(); expects[i] != id {
+			t.Errorf("expect the endpoint '%s', but got '%s'", expects[i], id)
+		}
+	}
 }

@@ -1,4 +1,4 @@
-// Copyright 2021 xgfone
+// Copyright 2021~2023 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,155 +16,270 @@ package loadbalancer
 
 import (
 	"context"
-	"sort"
+	"errors"
+	"sync"
+	"sync/atomic"
 )
 
-// Request represents a request.
-type Request interface {
-	// RemoteAddrString returns the address string of the remote peer,
-	// that's, the sender of the current request.
-	//
-	// Notice: it maybe return "" to represent that it is the originator
-	// and not the remote peer.
-	RemoteAddrString() string
+// ErrNoAvailableEndpoints is used to represents no available endpoints.
+var ErrNoAvailableEndpoints = errors.New("no available endpoints")
 
-	// SessionID returns the session id of the request context, which is used
-	// to bind the requests with the same session id to the same endpoint
-	// to be handled, when enabling the session stick.
-	//
-	// Notice: it maybe return an empty string, but use RemoteAddrString instead.
-	SessionID() string
-}
+// Pre-define some endpoint statuses.
+const (
+	EndpointStatusOnline  EndpointStatus = "on"
+	EndpointStatusOffline EndpointStatus = "off"
+)
 
-// EndpointState represents the running state of the endpoint.
+// EndpointStatus represents the endpoint status.
+type EndpointStatus string
+
+// IsOnline reports whether the endpoint status is online.
+func (s EndpointStatus) IsOnline() bool { return s == EndpointStatusOnline }
+
+// IsOffline reports whether the endpoint status is offline.
+func (s EndpointStatus) IsOffline() bool { return s == EndpointStatusOffline }
+
+// EndpointState is the runtime state of an endpoint.
 type EndpointState struct {
-	TotalConnections   int64 // The total number of all the connections.
-	CurrentConnections int64 // The number of all the current connections.
+	Total   uint64 // The total number to handle all the requests.
+	Success uint64 // The total number to handle the requests successfully.
+	Current uint64 // The number of the requests that are being handled.
 
-	// Extension is the extension data which is contained by the implementation
-	// but EndpointState.
-	Extension interface{}
+	// For the extra runtime information.
+	Extra interface{} `json:",omitempty" xml:",omitempty"`
 }
 
-// Endpoint represents a service endpoint.
-type Endpoint interface {
-	// ID returns the unique id of the endpoint, which may be an address or url.
-	ID() string
-
-	// Type returns the type of the endpoint, such as "http", "tcp", etc.
-	Type() string
-
-	// State returns the state of the current endpoint.
-	State() EndpointState
-
-	// MetaData returns the metadata of the endpoint.
-	MetaData() map[string]interface{}
-
-	// RoundTrip sends the request to the current endpoint.
-	RoundTrip(c context.Context, req Request) (response interface{}, err error)
+// IncSuccess increases the success state.
+func (rs *EndpointState) IncSuccess() {
+	atomic.AddUint64(&rs.Success, 1)
 }
 
-// EndpointUpdater is used to add or delete the endpoint.
-type EndpointUpdater interface {
-	DelEndpointByID(id string)
-	DelEndpoint(Endpoint)
-	AddEndpoint(Endpoint)
+// Inc increases the total and current state.
+func (rs *EndpointState) Inc() {
+	atomic.AddUint64(&rs.Total, 1)
+	atomic.AddUint64(&rs.Current, 1)
 }
 
-// EndpointBatchUpdater is used to add or delete the endpoints in bulk.
-type EndpointBatchUpdater interface {
-	AddEndpoints([]Endpoint)
-	DelEndpoints([]Endpoint)
+// Dec decreases the current state.
+func (rs *EndpointState) Dec() {
+	atomic.AddUint64(&rs.Current, ^uint64(0))
 }
 
-// Endpoints is a set of Endpoint.
-type Endpoints []Endpoint
-
-// Sort sorts the endpoints.
-func (es Endpoints) Sort()              { sort.Stable(es) }
-func (es Endpoints) Len() int           { return len(es) }
-func (es Endpoints) Swap(i, j int)      { es[i], es[j] = es[j], es[i] }
-func (es Endpoints) Less(i, j int) bool { return es[i].ID() < es[j].ID() }
-
-// Contains reports whether the endpoints contains the endpoint.
-func (es Endpoints) Contains(endpoint Endpoint) bool {
-	return binarySearchEndpoints(es, endpoint.ID()) != -1
-}
-
-// NotContains reports whether the endpoints does not contain the endpoint.
-func (es Endpoints) NotContains(endpoint Endpoint) bool {
-	return binarySearchEndpoints(es, endpoint.ID()) == -1
-}
-
-func binarySearchEndpoints(eps Endpoints, id string) int {
-	for low, high := 0, len(eps)-1; low <= high; {
-		mid := (low + high)
-		if _id := eps[mid].ID(); _id == id {
-			return mid
-		} else if id < _id {
-			high = mid - 1
-		} else {
-			low = mid + 1
-		}
+// Clone clones itself to a new one.
+//
+// If Extra has implemented the interface { Clone() interface{} }, call it//
+// to clone the field Extra.
+func (rs *EndpointState) Clone() EndpointState {
+	extra := rs.Extra
+	if clone, ok := rs.Extra.(interface{ Clone() interface{} }); ok {
+		extra = clone.Clone()
 	}
 
-	return -1
+	return EndpointState{
+		Extra:   extra,
+		Total:   atomic.LoadUint64(&rs.Total),
+		Success: atomic.LoadUint64(&rs.Success),
+		Current: atomic.LoadUint64(&rs.Current),
+	}
 }
 
-// WeightEndpoint represents an endpoint with the weight.
-type WeightEndpoint interface {
-	Endpoint
+// Endpoint represents an backend endpoint.
+type Endpoint interface {
+	// Static information
+	ID() string
+	Type() string
+	Info() interface{}
 
-	// Weight returns the weight of the endpoint, which may be equal to 0,
-	// but not the negative.
+	// Dynamic information
+	State() EndpointState
+	Status() EndpointStatus
+
+	// Handler
+	Update(info interface{}) error
+	Serve(ctx context.Context, req interface{}) error
+	Check(context.Context) error
+}
+
+// EndpointWrapper is a wrapper wrapping the backend endpoint.
+type EndpointWrapper interface {
+	Unwrap() Endpoint
+}
+
+// WeightedEndpoint represents an backend endpoint with the weight.
+type WeightedEndpoint interface {
+	// Weight returns the weight of the endpoint, which must be a positive integer.
 	//
-	// The larger the weight, the higher the weight.
+	// The bigger the value, the higher the weight.
 	Weight() int
-}
 
-// NewWeightEndpoint returns a WeightEndpoint with the weight and the endpoint.
-func NewWeightEndpoint(endpoint Endpoint, weight int) WeightEndpoint {
-	return NewDynamicWeightEndpoint(endpoint, func(Endpoint) int { return weight })
-}
-
-// NewDynamicWeightEndpoint returns a new WeightEndpoint with the endpoint and
-// the weigthFunc that returns the weight of the endpoint.
-func NewDynamicWeightEndpoint(endpoint Endpoint, weightFunc func(Endpoint) int) WeightEndpoint {
-	return weightEndpoint{Endpoint: endpoint, weight: weightFunc}
-}
-
-type weightEndpoint struct {
 	Endpoint
-	weight func(Endpoint) int
 }
 
-func (we weightEndpoint) Weight() int              { return we.weight(we.Endpoint) }
-func (we weightEndpoint) UnwrapEndpoint() Endpoint { return we.Endpoint }
-func (we weightEndpoint) MetaData() map[string]interface{} {
-	md := we.Endpoint.MetaData()
-	md["weight"] = we.weight(we.Endpoint)
-	return md
+// EndpointDiscovery is used to discover the endpoints.
+type EndpointDiscovery interface {
+	AllEndpoints() Endpoints
+	OffEndpoints() Endpoints
+	OnEndpoints() Endpoints
+	OnlineNum() int
 }
 
-// EndpointUnwrap is used to unwrap the inner endpoint.
-type EndpointUnwrap interface {
-	// Unwrap unwraps the inner endpoint, or nil instead if no inner endpoint.
-	UnwrapEndpoint() Endpoint
-}
+var _ EndpointDiscovery = Endpoints(nil)
 
-// UnwrapEndpoint unwraps the endpoint until it has not implemented
-// the interface EndpointUnwrap.
-func UnwrapEndpoint(endpoint Endpoint) Endpoint {
-	for {
-		if eu, ok := endpoint.(EndpointUnwrap); ok {
-			if ep := eu.UnwrapEndpoint(); ep != nil {
-				endpoint = ep
-			} else {
-				break
-			}
-		} else {
+// Endpoints represents a group of the endpoints.
+type Endpoints []Endpoint
+
+// OnlineNum implements the interface EndpointDiscovery#OnlineNum
+// to return the number of all the online endpoints.
+func (eps Endpoints) OnlineNum() int { return len(eps.OnEndpoints()) }
+
+// OnEndpoints implements the interface EndpointDiscovery#OnEndpoints
+// to return all the online endpoints.
+func (eps Endpoints) OnEndpoints() Endpoints {
+	var offline bool
+	for _, s := range eps {
+		if s.Status().IsOffline() {
+			offline = true
 			break
 		}
 	}
-	return endpoint
+	if !offline {
+		return eps
+	}
+
+	endpoints := make(Endpoints, 0, len(eps))
+	for _, s := range eps {
+		if s.Status().IsOnline() {
+			endpoints = append(endpoints, s)
+		}
+	}
+	return endpoints
+}
+
+// OffEndpoints implements the interface EndpointDiscovery#OffEndpoints
+// to return all the offline endpoints.
+func (eps Endpoints) OffEndpoints() Endpoints {
+	var online bool
+	for _, s := range eps {
+		if s.Status().IsOnline() {
+			online = true
+			break
+		}
+	}
+	if !online {
+		return eps
+	}
+
+	endpoints := make(Endpoints, 0, len(eps))
+	for _, s := range eps {
+		if s.Status().IsOffline() {
+			endpoints = append(endpoints, s)
+		}
+	}
+	return endpoints
+}
+
+// AllEndpoints implements the interface EndpointDiscovery#AllEndpoints
+// to return all the endpoints.
+func (eps Endpoints) AllEndpoints() Endpoints { return eps }
+
+// Contains reports whether the endpoints contains the endpoint indicated by the id.
+func (eps Endpoints) Contains(endpointID string) bool {
+	for _, s := range eps {
+		if s.ID() == endpointID {
+			return true
+		}
+	}
+	return false
+}
+
+// Sort the endpoints by the ASC order.
+func (eps Endpoints) Len() int      { return len(eps) }
+func (eps Endpoints) Swap(i, j int) { eps[i], eps[j] = eps[j], eps[i] }
+func (eps Endpoints) Less(i, j int) bool {
+	iw, jw := GetEndpointWeight(eps[i]), GetEndpointWeight(eps[j])
+	if iw < jw {
+		return true
+	} else if iw == jw {
+		return eps[i].ID() < eps[j].ID()
+	} else {
+		return false
+	}
+}
+
+// GetEndpointWeight returns the weight of the endpoint if it has implements
+// the interface WeightedEndpoint. Or, check whether it has implemented
+// the interface EndpointWrapper and unwrap it.
+// If still failing, return 1 instead.
+func GetEndpointWeight(ep Endpoint) int {
+	switch s := ep.(type) {
+	case WeightedEndpoint:
+		return s.Weight()
+
+	case EndpointWrapper:
+		return GetEndpointWeight(s.Unwrap())
+
+	default:
+		return 1
+	}
+}
+
+var (
+	eppool4   = sync.Pool{New: func() any { return make(Endpoints, 0, 4) }}
+	eppool8   = sync.Pool{New: func() any { return make(Endpoints, 0, 8) }}
+	eppool16  = sync.Pool{New: func() any { return make(Endpoints, 0, 16) }}
+	eppool32  = sync.Pool{New: func() any { return make(Endpoints, 0, 32) }}
+	eppool64  = sync.Pool{New: func() any { return make(Endpoints, 0, 64) }}
+	eppool128 = sync.Pool{New: func() any { return make(Endpoints, 0, 128) }}
+)
+
+// AcquireEndpoints acquires a preallocated zero-length endpoints from the pool.
+func AcquireEndpoints(expectedMaxCap int) Endpoints {
+	switch {
+	case expectedMaxCap <= 4:
+		return eppool4.Get().(Endpoints)
+
+	case expectedMaxCap <= 8:
+		return eppool8.Get().(Endpoints)
+
+	case expectedMaxCap <= 16:
+		return eppool16.Get().(Endpoints)
+
+	case expectedMaxCap <= 32:
+		return eppool32.Get().(Endpoints)
+
+	case expectedMaxCap <= 64:
+		return eppool64.Get().(Endpoints)
+
+	default:
+		return eppool128.Get().(Endpoints)
+	}
+}
+
+// ReleaseEndpoints releases the endpoints back into the pool.
+func ReleaseEndpoints(eps Endpoints) {
+	for i, _len := 0, len(eps); i < _len; i++ {
+		eps[i] = nil
+	}
+
+	eps = eps[:0]
+	cap := cap(eps)
+	switch {
+	case cap < 8:
+		eppool4.Put(eps)
+
+	case cap < 16:
+		eppool8.Put(eps)
+
+	case cap < 32:
+		eppool16.Put(eps)
+
+	case cap < 64:
+		eppool32.Put(eps)
+
+	case cap < 128:
+		eppool64.Put(eps)
+
+	default:
+		eppool128.Put(eps)
+	}
 }

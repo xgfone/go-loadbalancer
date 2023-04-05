@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package loadbalancer provides a common loadbalancer.
-package loadbalancer
+// Package httpep provides a backend endpoint based on the stdlib "net/http".
+package httpep

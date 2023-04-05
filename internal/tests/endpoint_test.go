@@ -12,5 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package loadbalancer provides a common loadbalancer.
-package loadbalancer
+package tests
+
+import "testing"
+
+func TestNewEndpoint(t *testing.T) {
+	ep := NewEndpoint("1.2.3.4", 1)
+	ep.(*endpoint).current = 0
+	ep.Serve(nil, nil)
+	ep.Serve(nil, nil)
+
+	state := ep.State()
+	if state.Total != 2 {
+		t.Errorf("expect total=%d, but got %d", 2, state.Total)
+	}
+	if state.Success != 2 {
+		t.Errorf("expect success=%d, but got %d", 2, state.Success)
+	}
+	if state.Current != 0 {
+		t.Errorf("expect current=%d, but got %d", 0, state.Current)
+	}
+}

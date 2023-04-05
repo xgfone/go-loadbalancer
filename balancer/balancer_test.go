@@ -1,4 +1,4 @@
-// Copyright 2021 xgfone
+// Copyright 2023 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,18 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build go1.13
+package balancer
 
-package loadbalancer
+import "testing"
 
-import (
-	"context"
-	"io"
-	"net/http"
-)
+func TestRegisteredBuiltinBuidler(t *testing.T) {
+	expects := []string{
+		"random",
+		"round_robin",
+		"weight_random",
+		"weight_round_robin",
+		"source_ip_hash",
+		"least_conn",
+	}
 
-// newHTTPRequestWithContext is the compatibility of http.NewRequestWithContext.
-func newHTTPRequestWithContext(ctx context.Context, method, url string,
-	body io.Reader) (*http.Request, error) {
-	return http.NewRequestWithContext(ctx, method, url, body)
+	for _, typ := range expects {
+		if _, err := Build(typ, nil); err != nil {
+			t.Error(err)
+		} else if _, err := Build(typ, nil); err != nil {
+			t.Error(err)
+		}
+	}
 }
