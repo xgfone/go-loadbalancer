@@ -1,5 +1,7 @@
 github.com/xgfone/go-atomicvalue v0.2.0 h1:C/28ARO2Nsx1UymHfpxQRxwNwseSDlsgQgsM1VahV6U=
 github.com/xgfone/go-atomicvalue v0.2.0/go.mod h1:fAKLVfK1snK0JKAFRsKhIhd220Cg9SSEuvOay6MXs88=
+github.com/xgfone/go-checker v0.1.0 h1:7pOagpe0OEzcLoHkmS3VwbjYGxd+fKYZbj5125MHOxs=
+github.com/xgfone/go-checker v0.1.0/go.mod h1:HNkJUfk+bHfGLsI5PnnX3dYrS6aD+eMkcQDLjP2iWrU=
 github.com/xgfone/go-defaults v0.3.0 h1:l1UwwLRIWPMmOzZ4RNR7hALb6sY8zQxeaHwnkRvDMcI=
 github.com/xgfone/go-defaults v0.3.0/go.mod h1:zwcnD8escc6E5QrCNKRLQddb4/hcUnUOM20kUeki18Y=
 github.com/xgfone/go-generics v0.1.0 h1:Uw6cqXZJRAa49wvwLF6S+mnuBhFZcCCUSJaNYo0LmMI=

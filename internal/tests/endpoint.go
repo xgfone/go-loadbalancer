@@ -31,7 +31,7 @@ func (ep *endpoint) Weight() int                         { return ep.weight }
 func (ep *endpoint) ID() string                          { return ep.ip }
 func (ep *endpoint) Type() string                        { return "" }
 func (ep *endpoint) Info() interface{}                   { return nil }
-func (ep *endpoint) Check(context.Context) error         { return nil }
+func (ep *endpoint) Check(context.Context) bool          { return true }
 func (ep *endpoint) Update(info interface{}) error       { return nil }
 func (ep *endpoint) Status() loadbalancer.EndpointStatus { return loadbalancer.EndpointStatusOnline }
 func (ep *endpoint) State() loadbalancer.EndpointState {

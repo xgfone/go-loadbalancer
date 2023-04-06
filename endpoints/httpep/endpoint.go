@@ -214,8 +214,6 @@ func handleResponse(w http.ResponseWriter, resp *http.Response) error {
 	return err
 }
 
-var _ loadbalancer.WeightedEndpoint = &httpEndpoint{}
-
 type httpEndpoint struct {
 	state loadbalancer.EndpointState
 	conf  atomic.Value
@@ -236,11 +234,12 @@ func (s *httpEndpoint) Info() interface{}                   { return s.loadConf(
 func (s *httpEndpoint) Weight() int                         { return s.loadConf().getWeight(s) }
 func (s *httpEndpoint) Status() loadbalancer.EndpointStatus { return s.loadConf().getStatus(s) }
 func (s *httpEndpoint) State() loadbalancer.EndpointState   { return s.state.Clone() }
-func (s *httpEndpoint) Check(ctx context.Context) (err error) {
+func (s *httpEndpoint) Check(ctx context.Context) (ok bool) {
 	conf := s.loadConf()
 	req, err := conf.CheckURL.Request(ctx, http.MethodGet)
 	if err != nil {
-		return err
+		slog.Error("fail to new the check request", "epid", s.ID(), "err", err)
+		return false
 	}
 
 	resp, err := conf.getClient(req).Do(req)
@@ -248,12 +247,11 @@ func (s *httpEndpoint) Check(ctx context.Context) (err error) {
 		io.CopyBuffer(io.Discard, resp.Body, make([]byte, 256))
 		resp.Body.Close()
 	}
-
-	if err == nil && resp.StatusCode >= 400 {
-		err = fmt.Errorf("unexpected status code '%d'", resp.StatusCode)
+	if err != nil {
+		slog.Error("fail to check the endpoint", "epid", s.ID(), "err", err)
+		return false
 	}
-
-	return
+	return resp.StatusCode < 400
 }
 
 func (s *httpEndpoint) Serve(ctx context.Context, req interface{}) (err error) {

@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xgfone/go-checker"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
@@ -48,8 +49,8 @@ func TestHealthCheck(t *testing.T) {
 	defer hc.Stop()
 
 	hc.AddUpdater("updater1", updater1)
-	hc.UpsertEndpoint(tests.NewEndpoint("id1", 1), CheckConfig{})
-	hc.UpsertEndpoint(tests.NewEndpoint("id2", 1), CheckConfig{})
+	hc.UpsertEndpoint(tests.NewEndpoint("id1", 1), checker.Config{})
+	hc.UpsertEndpoint(tests.NewEndpoint("id2", 1), checker.Config{})
 	hc.AddUpdater("updater2", updater2)
 
 	time.Sleep(time.Millisecond * 500)

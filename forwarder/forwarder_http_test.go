@@ -72,8 +72,8 @@ func TestLoadBalancer(t *testing.T) {
 	if url := ep1.Info().(httpep.Config).URL.String(); url != "http://127.0.0.1:8101" {
 		t.Errorf("expect url '%s', but got '%s'", "http://127.0.0.1:8101", url)
 	}
-	if err := ep1.Check(context.Background()); err != nil {
-		t.Errorf("health check failed: %s", err)
+	if ok := ep1.Check(context.Background()); !ok {
+		t.Errorf("the endpoint is offline")
 	}
 
 	forwarder.ResetEndpoints(ep1, ep2)
