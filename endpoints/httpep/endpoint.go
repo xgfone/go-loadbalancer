@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync/atomic"
+	"time"
 
 	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
@@ -52,8 +53,7 @@ type Config struct {
 	// Handle the request or response.
 	//
 	// Optional
-	GetHTTPClient  func(*http.Request) *http.Client // Default: use http.DefaultClient
-	HandleRequest  func(*http.Client, *http.Request) (*http.Response, error)
+	HandleRequest  func(*http.Request) (*http.Response, error)
 	HandleResponse func(http.ResponseWriter, *http.Response) error
 
 	// If DynamicWeight is configured, use it. Or use StaticWeight.
@@ -86,10 +86,9 @@ type config struct {
 	queries  url.Values
 	rawQuery string
 
-	getClient      func(*http.Request) *http.Client
 	getWeight      func(loadbalancer.Endpoint) int
 	getStatus      func(loadbalancer.Endpoint) loadbalancer.EndpointStatus
-	handleRequest  func(*http.Client, *http.Request) (*http.Response, error)
+	handleRequest  func(*http.Request) (*http.Response, error)
 	handleResponse func(http.ResponseWriter, *http.Response) error
 }
 
@@ -157,11 +156,6 @@ func (c *config) init() error {
 	if c.handleResponse == nil {
 		c.handleResponse = handleResponse
 	}
-	if c.GetHTTPClient == nil {
-		c.getClient = getHTTPClient
-	} else {
-		c.getClient = c.GetHTTPClient
-	}
 
 	if c.CheckURL.Method == "" {
 		c.CheckURL.Method = http.MethodGet
@@ -184,23 +178,12 @@ func (c config) getStaticWeight(loadbalancer.Endpoint) int {
 	return c.StaticWeight
 }
 
-func getHTTPClient(*http.Request) *http.Client {
-	return http.DefaultClient
-}
-
 func getStaticStatus(s loadbalancer.Endpoint) loadbalancer.EndpointStatus {
 	return loadbalancer.EndpointStatusOnline
 }
 
-func handleRequest(client *http.Client, req *http.Request) (*http.Response, error) {
-	resp, err := client.Do(req)
-	if slog.Enabled(req.Context(), slog.LevelTrace) {
-		slog.Trace("forward the http request",
-			"requestid", defaults.GetRequestID(req.Context(), req),
-			"method", req.Method, "host", req.Host, "url", req.URL.String(),
-			"err", err)
-	}
-	return resp, err
+func handleRequest(req *http.Request) (*http.Response, error) {
+	return http.DefaultClient.Do(req)
 }
 
 func handleResponse(w http.ResponseWriter, resp *http.Response) error {
@@ -217,18 +200,25 @@ func handleResponse(w http.ResponseWriter, resp *http.Response) error {
 type httpEndpoint struct {
 	state loadbalancer.EndpointState
 	conf  atomic.Value
+	epid  string
 }
 
 func (s *httpEndpoint) loadConf() config { return s.conf.Load().(config) }
 func (s *httpEndpoint) Update(info interface{}) (err error) {
 	conf, err := newConfig(info.(Config))
-	if err == nil {
-		s.conf.Store(conf)
+	if err != nil {
+		if s.epid == "" {
+			s.epid = conf.id
+		} else if s.epid != conf.id {
+			err = fmt.Errorf("the endpoint id is inconsistent: old=%s, new=%s", s.epid, conf.id)
+		} else {
+			s.conf.Store(conf)
+		}
 	}
 	return
 }
 
-func (s *httpEndpoint) ID() string                          { return s.loadConf().id }
+func (s *httpEndpoint) ID() string                          { return s.epid }
 func (s *httpEndpoint) Type() string                        { return "http" }
 func (s *httpEndpoint) Info() interface{}                   { return s.loadConf().Config }
 func (s *httpEndpoint) Weight() int                         { return s.loadConf().getWeight(s) }
@@ -242,7 +232,7 @@ func (s *httpEndpoint) Check(ctx context.Context) (ok bool) {
 		return false
 	}
 
-	resp, err := conf.getClient(req).Do(req)
+	resp, err := conf.handleRequest(req)
 	if resp != nil {
 		io.CopyBuffer(io.Discard, resp.Body, make([]byte, 256))
 		resp.Body.Close()
@@ -254,10 +244,12 @@ func (s *httpEndpoint) Check(ctx context.Context) (ok bool) {
 	return resp.StatusCode < 400
 }
 
-func (s *httpEndpoint) Serve(ctx context.Context, req interface{}) (err error) {
-	w, r, ok := GetReqRespFromCtx(ctx)
+func (s *httpEndpoint) Serve(ctx context.Context, _req interface{}) (err error) {
+	start := time.Now()
+
+	w, req, ok := GetReqRespFromCtx(ctx)
 	if !ok {
-		w, r, _ = GetReqRespFromCtx(req.(*http.Request).Context())
+		w, req, _ = GetReqRespFromCtx(_req.(*http.Request).Context())
 	}
 
 	s.state.Inc()
@@ -270,7 +262,7 @@ func (s *httpEndpoint) Serve(ctx context.Context, req interface{}) (err error) {
 
 	conf := s.loadConf()
 
-	r = r.Clone(ctx)
+	r := req.Clone(ctx)
 	r.RequestURI = ""      // Pretend to be a client request.
 	r.URL.Host = conf.addr // Dial to the backend http endpoint.
 	r.URL.Scheme = conf.URL.Scheme
@@ -311,7 +303,7 @@ func (s *httpEndpoint) Serve(ctx context.Context, req interface{}) (err error) {
 		}
 	}
 
-	resp, err := conf.handleRequest(conf.getClient(r), r)
+	resp, err := conf.handleRequest(r)
 	if resp != nil {
 		defer resp.Body.Close()
 	}
@@ -319,5 +311,44 @@ func (s *httpEndpoint) Serve(ctx context.Context, req interface{}) (err error) {
 	if err == nil {
 		err = conf.handleResponse(w, resp)
 	}
+
+	cost := time.Since(start)
+	if err != nil {
+		slog.Error("forward the http request to the backend http endpoint",
+			"reqid", defaults.GetRequestID(ctx, req),
+			"srcreq", map[string]interface{}{
+				"raddr":  req.RemoteAddr,
+				"method": req.Method,
+				"host":   req.Host,
+				"uri":    req.RequestURI,
+			},
+			"dstreq", map[string]interface{}{
+				"method": r.Method,
+				"host":   r.Host,
+				"uri":    r.URL.String(),
+			},
+			"start", start.Unix(),
+			"cost", cost.String(),
+			"err", err,
+		)
+	} else if slog.Enabled(ctx, slog.LevelDebug) {
+		slog.Debug("forward the http request to the backend http endpoint",
+			"reqid", defaults.GetRequestID(ctx, req),
+			"srcreq", map[string]interface{}{
+				"raddr":  req.RemoteAddr,
+				"method": req.Method,
+				"host":   req.Host,
+				"uri":    req.RequestURI,
+			},
+			"dstreq", map[string]interface{}{
+				"method": r.Method,
+				"host":   r.Host,
+				"uri":    r.URL.String(),
+			},
+			"start", start.Unix(),
+			"cost", cost.String(),
+		)
+	}
+
 	return err
 }
