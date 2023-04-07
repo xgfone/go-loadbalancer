@@ -70,9 +70,9 @@ type Config struct {
 
 // NewEndpoint returns a new loadbalancer.WeightedEndpoint based on HTTP.
 func (c Config) NewEndpoint() (loadbalancer.WeightedEndpoint, error) {
-	s := &httpEndpoint{}
-	err := s.Update(c)
-	return s, err
+	ep := &httpEndpoint{}
+	err := ep.Update(c)
+	return ep, err
 }
 
 type config struct {
@@ -203,31 +203,31 @@ type httpEndpoint struct {
 	epid  string
 }
 
-func (s *httpEndpoint) loadConf() config { return s.conf.Load().(config) }
-func (s *httpEndpoint) Update(info interface{}) (err error) {
+func (ep *httpEndpoint) loadConf() config { return ep.conf.Load().(config) }
+func (ep *httpEndpoint) Update(info interface{}) (err error) {
 	conf, err := newConfig(info.(Config))
 	if err == nil {
-		if s.epid == "" {
-			s.epid = conf.id
-		} else if s.epid != conf.id {
-			return fmt.Errorf("the endpoint id is inconsistent: old=%s, new=%s", s.epid, conf.id)
+		if ep.epid == "" {
+			ep.epid = conf.id
+		} else if ep.epid != conf.id {
+			return fmt.Errorf("the endpoint id is inconsistent: old=%s, new=%s", ep.epid, conf.id)
 		}
-		s.conf.Store(conf)
+		ep.conf.Store(conf)
 	}
 	return
 }
 
-func (s *httpEndpoint) ID() string                          { return s.epid }
-func (s *httpEndpoint) Type() string                        { return "http" }
-func (s *httpEndpoint) Info() interface{}                   { return s.loadConf().Config }
-func (s *httpEndpoint) Weight() int                         { return s.loadConf().getWeight(s) }
-func (s *httpEndpoint) Status() loadbalancer.EndpointStatus { return s.loadConf().getStatus(s) }
-func (s *httpEndpoint) State() loadbalancer.EndpointState   { return s.state.Clone() }
-func (s *httpEndpoint) Check(ctx context.Context) (ok bool) {
-	conf := s.loadConf()
+func (ep *httpEndpoint) ID() string                          { return ep.epid }
+func (ep *httpEndpoint) Type() string                        { return "http" }
+func (ep *httpEndpoint) Info() interface{}                   { return ep.loadConf().Config }
+func (ep *httpEndpoint) Weight() int                         { return ep.loadConf().getWeight(ep) }
+func (ep *httpEndpoint) Status() loadbalancer.EndpointStatus { return ep.loadConf().getStatus(ep) }
+func (ep *httpEndpoint) State() loadbalancer.EndpointState   { return ep.state.Clone() }
+func (ep *httpEndpoint) Check(ctx context.Context) (ok bool) {
+	conf := ep.loadConf()
 	req, err := conf.CheckURL.Request(ctx, http.MethodGet)
 	if err != nil {
-		slog.Error("fail to new the check request", "epid", s.ID(), "err", err)
+		slog.Error("fail to new the check request", "epid", ep.ID(), "err", err)
 		return false
 	}
 
@@ -237,13 +237,13 @@ func (s *httpEndpoint) Check(ctx context.Context) (ok bool) {
 		resp.Body.Close()
 	}
 	if err != nil {
-		slog.Error("fail to check the endpoint", "epid", s.ID(), "err", err)
+		slog.Error("fail to check the endpoint", "epid", ep.ID(), "err", err)
 		return false
 	}
 	return resp.StatusCode < 400
 }
 
-func (s *httpEndpoint) Serve(ctx context.Context, _req interface{}) (err error) {
+func (ep *httpEndpoint) Serve(ctx context.Context, _req interface{}) (err error) {
 	start := time.Now()
 
 	w, req, ok := GetReqRespFromCtx(ctx)
@@ -251,15 +251,15 @@ func (s *httpEndpoint) Serve(ctx context.Context, _req interface{}) (err error) 
 		w, req, _ = GetReqRespFromCtx(_req.(*http.Request).Context())
 	}
 
-	s.state.Inc()
+	ep.state.Inc()
 	defer func() {
-		s.state.Dec()
+		ep.state.Dec()
 		if err == nil {
-			s.state.IncSuccess()
+			ep.state.IncSuccess()
 		}
 	}()
 
-	conf := s.loadConf()
+	conf := ep.loadConf()
 
 	r := req.Clone(ctx)
 	r.RequestURI = ""      // Pretend to be a client request.
@@ -332,7 +332,7 @@ func (s *httpEndpoint) Serve(ctx context.Context, _req interface{}) (err error) 
 		)
 	} else if slog.Enabled(ctx, slog.LevelDebug) {
 		slog.Debug("forward the http request to the backend http endpoint",
-			"epid", s.ID(),
+			"epid", ep.ID(),
 			"reqid", defaults.GetRequestID(ctx, req),
 			"srcreq", map[string]interface{}{
 				"raddr":  req.RemoteAddr,
