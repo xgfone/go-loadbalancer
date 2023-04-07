@@ -23,7 +23,7 @@ import (
 	"github.com/xgfone/go-loadbalancer/balancer/sourceiphash"
 )
 
-var builders = make(map[string]Builder, 16)
+var builders = make(map[string]Builder, 8)
 
 func init() {
 	RegisterBalancer(random.NewBalancer(""))
@@ -37,13 +37,14 @@ func init() {
 // Builder is used to build a new Balancer with the config.
 type Builder func(config interface{}) (Balancer, error)
 
-// RegisterBuidler registers the given balancer builder.
+// RegisterBuidler registers the balancer builder for the given policy.
 //
-// If the balancer builder typed "typ" has existed, override it to the new.
-func RegisterBuidler(typ string, builder Builder) { builders[typ] = builder }
+// If the balancer builder of "policy" has existed, override it to the new.
+func RegisterBuidler(policy string, builder Builder) {
+	builders[policy] = builder
+}
 
-// RegisterBalancer registers the balancer as the builder,
-// which uses the policy as the buidler type.
+// RegisterBalancer uses the balancer itself as the builder to register.
 //
 // For builtin balancers as following, they have been registered automatically,
 // which will ignore any builder config and never return an error.
@@ -58,26 +59,26 @@ func RegisterBalancer(b Balancer) {
 	RegisterBuidler(b.Policy(), func(interface{}) (Balancer, error) { return b, nil })
 }
 
-// GetBuilder returns the registered balancer builder by the type.
+// GetBuilder returns the registered balancer builder by the policy.
 //
-// If the balancer builder typed "typ" does not exist, return nil.
-func GetBuilder(typ string) Builder { return builders[typ] }
+// If the balancer builder of "policy" does not exist, return nil.
+func GetBuilder(policy string) Builder { return builders[policy] }
 
-// GetAllBuilderTypes returns the types of all the balancer builders.
-func GetAllBuilderTypes() []string {
-	types := make([]string, 0, len(builders))
-	for typ := range builders {
-		types = append(types, typ)
+// GetAllBuilderPolicies returns the policies of all the balancer builders.
+func GetAllBuilderPolicies() []string {
+	policies := make([]string, 0, len(builders))
+	for policy := range builders {
+		policies = append(policies, policy)
 	}
-	return types
+	return policies
 }
 
-// Build is a convenient function to build a new balancer typed "typ".
-func Build(typ string, config interface{}) (balancer Balancer, err error) {
-	if builder := GetBuilder(typ); builder != nil {
+// Build is a convenient function to build a new balancer of "policy".
+func Build(policy string, config interface{}) (balancer Balancer, err error) {
+	if builder := GetBuilder(policy); builder != nil {
 		balancer, err = builder(config)
 	} else {
-		err = fmt.Errorf("no the balancer builder typed '%s'", typ)
+		err = fmt.Errorf("no the balancer builder of the policy '%s'", policy)
 	}
 	return
 }
