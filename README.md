@@ -17,6 +17,7 @@ import (
 	"net/http"
 
 	"github.com/xgfone/go-binder"
+	"github.com/xgfone/go-checker"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer"
 	"github.com/xgfone/go-loadbalancer/endpoints/httpep"
@@ -46,9 +47,9 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 		Path     string `json:"path" validate:"required"`
 		Method   string `json:"method" validate:"required"`
 		Upstream struct {
-			ForwardPolicy string                  `json:"forwardPolicy" default:"weight_random"`
-			ForwardURL    httpep.URL              `json:"forwardUrl"`
-			HealthCheck   healthcheck.CheckConfig `json:"healthCheck"`
+			ForwardPolicy string         `json:"forwardPolicy" default:"weight_random"`
+			ForwardURL    httpep.URL     `json:"forwardUrl"`
+			HealthCheck   checker.Config `json:"healthCheck"`
 
 			Servers []struct {
 				IP     string `json:"ip" validate:"ip"`
