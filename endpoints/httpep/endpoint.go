@@ -314,6 +314,7 @@ func (ep *httpEndpoint) Serve(ctx context.Context, _req interface{}) (err error)
 	cost := time.Since(start)
 	if err != nil {
 		slog.Error("forward the http request to the backend http endpoint",
+			"epid", ep.ID(),
 			"reqid", defaults.GetRequestID(ctx, req),
 			"srcreq", map[string]interface{}{
 				"raddr":  req.RemoteAddr,
