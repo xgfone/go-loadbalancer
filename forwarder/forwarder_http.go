@@ -44,13 +44,13 @@ func handleHTTPError(f *Forwarder, w http.ResponseWriter, r *http.Request, err e
 	case nil:
 		if slog.Enabled(r.Context(), slog.LevelDebug) {
 			slog.Debug("forward the http request",
-				"requestid", defaults.GetRequestID(r.Context(), r),
+				"reqid", defaults.GetRequestID(r.Context(), r),
 				"forwarder", f.name,
 				"balancer", f.GetBalancer().Policy(),
-				"clientaddr", r.RemoteAddr,
-				"reqhost", r.Host,
-				"reqmethod", r.Method,
-				"reqpath", r.URL.Path)
+				"raddr", r.RemoteAddr,
+				"method", r.Method,
+				"host", r.Host,
+				"uri", r.RequestURI)
 		}
 		return
 
@@ -66,13 +66,13 @@ func handleHTTPError(f *Forwarder, w http.ResponseWriter, r *http.Request, err e
 	}
 
 	slog.Error("fail to forward the http request",
-		"requestid", defaults.GetRequestID(r.Context(), r),
+		"reqid", defaults.GetRequestID(r.Context(), r),
 		"forwarder", f.name,
 		"balancer", f.GetBalancer().Policy(),
-		"clientaddr", r.RemoteAddr,
-		"reqhost", r.Host,
-		"reqmethod", r.Method,
-		"reqpath", r.URL.Path,
+		"raddr", r.RemoteAddr,
+		"method", r.Method,
+		"host", r.Host,
+		"uri", r.RequestURI,
 		"err", err)
 }
 
