@@ -26,7 +26,10 @@ import (
 	"github.com/xgfone/go-loadbalancer/healthcheck"
 )
 
-var _ healthcheck.Updater = &Forwarder{}
+var (
+	_ healthcheck.Updater            = &Forwarder{}
+	_ loadbalancer.EndpointDiscovery = &Forwarder{}
+)
 
 // Forwarder is used to forward the request to one of the backend endpoints.
 type Forwarder struct {
@@ -53,10 +56,10 @@ func NewForwarder(name string, balancer balancer.Balancer) *Forwarder {
 	}
 }
 
-// Name reutrns the name of the loadbalander loadbalancer.
+// Name reutrns the name of the forwarder.
 func (f *Forwarder) Name() string { return f.name }
 
-// Type reutrns the type of the loadbalander loadbalancer.
+// Type reutrns the type of the forwarder, that's loadbalancer.
 func (f *Forwarder) Type() string { return "loadbalancer" }
 
 // GetBalancer returns the balancer.
@@ -184,24 +187,33 @@ func (f *Forwarder) GetEndpoint(epid string) (ep loadbalancer.Endpoint, ok bool)
 	return f.epmanager.GetEndpoint(epid)
 }
 
-// GetOnEndpoints only returns all the online endpoints.
+// OnlineNum implements the interfce loadbalancer.EndpointDiscovery#OnlineNum
+// to return the number of the online endpoints.
+func (f *Forwarder) OnlineNum() int {
+	return f.epmanager.OnlineNum()
+}
+
+// OnEndpoints implements the inerface loadbalancer.EndpointDiscovery#OnEndpoints
+// to only return all the online endpoints.
 //
 // This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) GetOnEndpoints() loadbalancer.Endpoints {
+func (f *Forwarder) OnEndpoints() loadbalancer.Endpoints {
 	return f.epmanager.OnEndpoints()
 }
 
-// GetOffEndpoints only returns all the offline endpoints.
+// OffEndpoints implements the inerface loadbalancer.EndpointDiscovery#OffEndpoints
+// to only return all the offline endpoints.
 //
 // This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) GetOffEndpoints() loadbalancer.Endpoints {
+func (f *Forwarder) OffEndpoints() loadbalancer.Endpoints {
 	return f.epmanager.OffEndpoints()
 }
 
-// GetAllEndpoints returns all the endpoints, which are a set of the wrappers
-// of the original endpoints and can be unwrapped by loadbalancer.UnwrapEndpoint.
+// AllEndpoints implements the inerface loadbalancer.EndpointDiscovery#OnEndpoints
+// to return all the endpoints, which are a set of the wrappers of the original
+// endpoints and can be unwrapped by loadbalancer.UnwrapEndpoint.
 //
 // This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) GetAllEndpoints() loadbalancer.Endpoints {
+func (f *Forwarder) AllEndpoints() loadbalancer.Endpoints {
 	return f.epmanager.AllEndpoints()
 }
