@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/xgfone/go-atomicvalue"
 	"github.com/xgfone/go-checker"
 	"github.com/xgfone/go-generics/maps"
 	"github.com/xgfone/go-loadbalancer"
@@ -31,18 +30,16 @@ import (
 var DefaultHealthChecker = NewHealthChecker()
 
 type epchecker struct {
-	ep atomicvalue.Value[loadbalancer.Endpoint]
+	loadbalancer.Endpoint
 	*checker.Checker
 }
 
 func newEndpointChecker(hc *HealthChecker, ep loadbalancer.Endpoint, conf checker.Config) *epchecker {
-	c := &epchecker{ep: atomicvalue.NewValue(ep)}
-	c.Checker = checker.NewChecker(ep.ID(), ep, hc.setOnline)
-	return c
+	return &epchecker{Endpoint: ep, Checker: checker.NewChecker(ep.ID(), ep, hc.setOnline)}
 }
 
-func (c *epchecker) GetEndpoint() loadbalancer.Endpoint   { return c.ep.Load() }
-func (c *epchecker) SetEndpoint(ep loadbalancer.Endpoint) { c.ep.Store(ep) }
+func (c *epchecker) GetEndpoint() loadbalancer.Endpoint   { return c.Endpoint }
+func (c *epchecker) SetEndpoint(ep loadbalancer.Endpoint) { c.Endpoint.Update(ep.Info()) }
 
 // Updater is used to update the endpoint status.
 type Updater interface {
@@ -172,7 +169,8 @@ func (hc *HealthChecker) UpsertEndpoint(ep loadbalancer.Endpoint, config checker
 
 func (hc *HealthChecker) upsertEndpoint(ep loadbalancer.Endpoint, config checker.Config) {
 	id := ep.ID()
-	if c, ok := hc.epmaps[id]; ok {
+	c, ok := hc.epmaps[id]
+	if ok {
 		c.SetEndpoint(ep)
 		c.SetConfig(config)
 	} else {
@@ -181,14 +179,14 @@ func (hc *HealthChecker) upsertEndpoint(ep loadbalancer.Endpoint, config checker
 		if hc.context != nil { // Has started
 			go c.Start(hc.context)
 		}
-
-		hc.updaters.Range(func(_, value interface{}) bool {
-			updater := value.(Updater)
-			updater.UpsertEndpoint(ep)
-			updater.SetEndpointOnline(id, c.Ok())
-			return true
-		})
 	}
+
+	hc.updaters.Range(func(_, value interface{}) bool {
+		updater := value.(Updater)
+		updater.UpsertEndpoint(ep)
+		updater.SetEndpointOnline(id, c.Ok())
+		return true
+	})
 }
 
 // RemoveEndpoint removes the endpoint by the endpoint id.
