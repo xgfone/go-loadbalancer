@@ -21,15 +21,23 @@ import (
 	"github.com/xgfone/go-loadbalancer"
 )
 
-func TestHTTPEndpoints(t *testing.T) {
-	s1, _ := Config{StaticWeight: 1, URL: URL{IP: "127.0.0.1", Port: 8001}}.NewEndpoint()
-	s2, _ := Config{StaticWeight: 1, URL: URL{IP: "127.0.0.1", Port: 8002}}.NewEndpoint()
-	s3, _ := Config{StaticWeight: 3, URL: URL{IP: "127.0.0.1", Port: 8003}}.NewEndpoint()
-	s4, _ := Config{StaticWeight: 3, URL: URL{IP: "127.0.0.1", Port: 8004}}.NewEndpoint()
-	s5, _ := Config{StaticWeight: 2, URL: URL{IP: "127.0.0.1", Port: 8005}}.NewEndpoint()
-	s6, _ := Config{StaticWeight: 2, URL: URL{IP: "127.0.0.1", Port: 8006}}.NewEndpoint()
+func newEndpoint(weight int, ip string, port uint16) loadbalancer.Endpoint {
+	ep, err := Config{StaticWeight: weight, URL: URL{IP: ip, Port: port}}.NewEndpoint()
+	if err != nil {
+		panic(err)
+	}
+	return ep
+}
 
-	eps := loadbalancer.Endpoints{s1, s2, s3, s4, s5, s6}
+func TestHTTPEndpoints(t *testing.T) {
+	ep1 := newEndpoint(1, "127.0.0.1", 8001)
+	ep2 := newEndpoint(1, "127.0.0.1", 8002)
+	ep3 := newEndpoint(3, "127.0.0.1", 8003)
+	ep4 := newEndpoint(3, "127.0.0.1", 8004)
+	ep5 := newEndpoint(2, "127.0.0.1", 8005)
+	ep6 := newEndpoint(2, "127.0.0.1", 8006)
+
+	eps := loadbalancer.Endpoints{ep1, ep2, ep3, ep4, ep5, ep6}
 	sort.Stable(eps)
 
 	exports := []uint16{8001, 8002, 8005, 8006, 8003, 8004}

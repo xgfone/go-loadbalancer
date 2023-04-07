@@ -199,21 +199,20 @@ func handleResponse(w http.ResponseWriter, resp *http.Response) error {
 
 type httpEndpoint struct {
 	state loadbalancer.EndpointState
-	conf  atomic.Value
+	conf  atomic.Value // config
 	epid  string
 }
 
 func (s *httpEndpoint) loadConf() config { return s.conf.Load().(config) }
 func (s *httpEndpoint) Update(info interface{}) (err error) {
 	conf, err := newConfig(info.(Config))
-	if err != nil {
+	if err == nil {
 		if s.epid == "" {
 			s.epid = conf.id
 		} else if s.epid != conf.id {
-			err = fmt.Errorf("the endpoint id is inconsistent: old=%s, new=%s", s.epid, conf.id)
-		} else {
-			s.conf.Store(conf)
+			return fmt.Errorf("the endpoint id is inconsistent: old=%s, new=%s", s.epid, conf.id)
 		}
+		s.conf.Store(conf)
 	}
 	return
 }
@@ -333,6 +332,7 @@ func (s *httpEndpoint) Serve(ctx context.Context, _req interface{}) (err error) 
 		)
 	} else if slog.Enabled(ctx, slog.LevelDebug) {
 		slog.Debug("forward the http request to the backend http endpoint",
+			"epid", s.ID(),
 			"reqid", defaults.GetRequestID(ctx, req),
 			"srcreq", map[string]interface{}{
 				"raddr":  req.RemoteAddr,
