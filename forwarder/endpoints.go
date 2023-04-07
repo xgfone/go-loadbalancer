@@ -133,12 +133,21 @@ func (m *endpointsManager) ResetEndpoints(eps ...loadbalancer.Endpoint) {
 }
 
 func (m *endpointsManager) UpsertEndpoints(eps ...loadbalancer.Endpoint) {
+	if len(eps) == 0 {
+		return
+	}
+
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	maps.AddSlice(m.eps, eps, func(s loadbalancer.Endpoint) (string, *endpoint) {
-		return s.ID(), newEndpoint(s)
-	})
+	for _, ep := range eps {
+		id := ep.ID()
+		if _ep, ok := m.eps[id]; ok {
+			_ep.Update(ep.Info())
+		} else {
+			m.eps[id] = newEndpoint(ep)
+		}
+	}
 	m.updateEndpoints()
 }
 
