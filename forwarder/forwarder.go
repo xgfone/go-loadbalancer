@@ -102,6 +102,13 @@ func (f *Forwarder) SwapEndpointDiscovery(new loadbalancer.EndpointDiscovery) (o
 
 // Serve implement the interface loadbalancer.Endpoint#Serve,
 // which will forward the request to one of the backend endpoints.
+//
+// req should have implemented one of the interfaces:
+//
+//	interface{ RemoteAddr() string }
+//	interface{ RemoteAddr() net.IP }
+//	interface{ RemoteAddr() net.Addr }
+//	interface{ RemoteAddr() netip.Addr }
 func (f *Forwarder) Serve(ctx context.Context, req interface{}) error {
 	sd := f.GetEndpointDiscovery()
 	if sd == nil {
