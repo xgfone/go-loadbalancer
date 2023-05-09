@@ -38,7 +38,7 @@ type Forwarder struct {
 	balancer  atomicvalue.Value[balancer.Balancer]
 	discovery atomicvalue.Value[loadbalancer.EndpointDiscovery]
 
-	epmanager *endpointsManager
+	epmanager *loadbalancer.EndpointManager
 	httperror HTTPErrorHandler
 }
 
@@ -51,7 +51,7 @@ func NewForwarder(name string, balancer balancer.Balancer) *Forwarder {
 	return &Forwarder{
 		name:      name,
 		balancer:  atomicvalue.NewValue(balancer),
-		epmanager: newEndpointsManager(),
+		epmanager: loadbalancer.NewEndpointManager(),
 		httperror: handleHTTPError,
 	}
 }
