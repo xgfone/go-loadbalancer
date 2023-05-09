@@ -151,6 +151,23 @@ func (hc *HealthChecker) GetUpdaters() map[string]Updater {
 	return updaters
 }
 
+// ResetEndpoints resets all the endpoints to the news.
+func (hc *HealthChecker) ResetEndpoints(news loadbalancer.Endpoints, config checker.Config) {
+	hc.slock.Lock()
+	defer hc.slock.Unlock()
+
+	for _, ep := range news {
+		hc.upsertEndpoint(ep, config)
+	}
+
+	for id := range hc.epmaps {
+		if !news.Contains(id) {
+			c, ok := maps.Pop(hc.epmaps, id)
+			hc.cleanChecker(id, c, ok)
+		}
+	}
+}
+
 // UpsertEndpoints adds or updates a set of the endpoints with the same healthcheck config.
 func (hc *HealthChecker) UpsertEndpoints(eps loadbalancer.Endpoints, config checker.Config) {
 	hc.slock.Lock()
@@ -198,10 +215,14 @@ func (hc *HealthChecker) RemoveEndpoint(epid string) {
 	hc.slock.Lock()
 	c, ok := maps.Pop(hc.epmaps, epid)
 	hc.slock.Unlock()
+	hc.cleanChecker(epid, c, ok)
+}
+
+func (hc *HealthChecker) cleanChecker(id string, c *epchecker, ok bool) {
 	if ok {
 		c.Stop()
 		hc.updaters.Range(func(_, value interface{}) bool {
-			value.(Updater).RemoveEndpoint(epid)
+			value.(Updater).RemoveEndpoint(id)
 			return true
 		})
 	}
