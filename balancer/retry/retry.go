@@ -64,8 +64,14 @@ func (b Retry) Forward(c context.Context, r interface{}, sd loadbalancer.Endpoin
 		default:
 		}
 
-		if err = b.Balancer.Forward(c, r, sd); err == nil {
-			break
+		err = b.Balancer.Forward(c, r, sd)
+		switch e := err.(type) {
+		case nil:
+			return
+		case loadbalancer.RetryError:
+			if !e.Retry() {
+				return
+			}
 		}
 
 		if b.Interval > 0 {
