@@ -15,11 +15,15 @@
 package processor
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/xgfone/go-apiserver/http/reqresp"
 )
 
-func errDefaultHandler(w http.ResponseWriter, err error) (e error) {
+func defaultHandleError(w http.ResponseWriter, err error) (e error) {
 	w.WriteHeader(500)
 	if h, ok := err.(http.Handler); ok {
 		h.ServeHTTP(w, nil)
@@ -35,21 +39,32 @@ func errDefaultHandler(w http.ResponseWriter, err error) (e error) {
 // handleError may be nil, which is equal to send the response with code 500.
 func DefaultResponseBody(rewriteContentType bool, handleError func(http.ResponseWriter, error) error) ResponseProcessor {
 	if handleError == nil {
-		handleError = errDefaultHandler
+		handleError = defaultHandleError
 	}
 
-	return SimpleResponseProcessor(func(w http.ResponseWriter, r *http.Response, err error) error {
-		if err != nil {
-			err = handleError(w, err)
-			return err
+	return ResponseProcessorFunc(func(ctx context.Context, w http.ResponseWriter,
+		req *http.Request, resp *http.Response, err error) error {
+		rw, ok := w.(reqresp.ResponseWriter)
+		if !ok {
+			c := reqresp.GetContext(w, req)
+			rw = c.ResponseWriter
 		}
 
-		if rewriteContentType {
-			w.Header().Set("Content-Type", r.Header.Get("Content-Type"))
+		if rw.WroteHeader() {
+			if err == nil {
+				panic(fmt.Errorf("re-respond for %s %s", req.Method, req.URL.Path))
+			} else {
+				err = handleError(w, err)
+			}
+		} else {
+			if rewriteContentType {
+				w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+			}
+
+			w.WriteHeader(resp.StatusCode)
+			_, err = io.CopyBuffer(w, resp.Body, make([]byte, 1024))
 		}
 
-		w.WriteHeader(r.StatusCode)
-		_, err = io.CopyBuffer(w, r.Body, make([]byte, 1024))
 		return err
 	})
 }
