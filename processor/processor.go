@@ -123,7 +123,7 @@ func CompactRequestProcessors(processors ...RequestProcessor) RequestProcessors 
 			}
 		case RequestProcessors:
 			if len(p) > 0 {
-				_processors = append(_processors, p...)
+				_processors = append(_processors, CompactRequestProcessors(p...)...)
 			}
 		default:
 			_processors = append(_processors, p)
@@ -145,7 +145,7 @@ func CompactResponseProcessors(processors ...ResponseProcessor) ResponseProcesso
 			}
 		case ResponseProcessors:
 			if len(p) > 0 {
-				_processors = append(_processors, p...)
+				_processors = append(_processors, CompactResponseProcessors(p...)...)
 			}
 		default:
 			_processors = append(_processors, p)
