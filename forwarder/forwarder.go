@@ -224,3 +224,11 @@ func (f *Forwarder) OffEndpoints() loadbalancer.Endpoints {
 func (f *Forwarder) AllEndpoints() loadbalancer.Endpoints {
 	return f.epmanager.AllEndpoints()
 }
+
+// AllOriginEndpoints is the same as AllEndpoints,
+// but returns the original endpoints instead.
+//
+// This is the inner endpoint management of the loadbalancer forwarder.
+func (f *Forwarder) AllOriginEndpoints() loadbalancer.Endpoints {
+	return f.epmanager.AllOriginEndpoints()
+}

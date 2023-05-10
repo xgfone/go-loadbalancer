@@ -88,6 +88,17 @@ func (m *EndpointManager) AllEndpoints() Endpoints {
 	return m.alleps.Load().(Endpoints)
 }
 
+// AllOriginEndpoints is the same as AllEndpoints,
+// but returns the original endpoints instead.
+func (m *EndpointManager) AllOriginEndpoints() Endpoints {
+	endpoints := m.AllEndpoints()
+	eps := make(Endpoints, len(endpoints))
+	for i, ep := range endpoints {
+		eps[i] = ep.(*endpoint)
+	}
+	return eps
+}
+
 // SetEndpointStatus sets the status of the endpoint.
 //
 // The default status of the endpoint is EndpointStatusOnline.
