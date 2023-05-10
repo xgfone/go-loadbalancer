@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/xgfone/go-atomicvalue"
 	"github.com/xgfone/go-checker"
 	"github.com/xgfone/go-generics/maps"
 	"github.com/xgfone/go-loadbalancer"
@@ -32,12 +33,21 @@ var DefaultHealthChecker = NewHealthChecker()
 type epchecker struct {
 	loadbalancer.Endpoint
 	*checker.Checker
+	config atomicvalue.Value[Checker]
 }
 
-func newEndpointChecker(hc *HealthChecker, ep loadbalancer.Endpoint, conf checker.Config) *epchecker {
-	return &epchecker{Endpoint: ep, Checker: checker.NewChecker(ep.ID(), ep, hc.setOnline)}
+func newEndpointChecker(hc *HealthChecker, ep loadbalancer.Endpoint, config Checker) *epchecker {
+	epc := &epchecker{Endpoint: ep}
+	epc.Checker = checker.NewChecker(ep.ID(), epc, hc.setOnline)
+	epc.SetChecker(config)
+	return epc
 }
 
+func (c *epchecker) GetChecker() Checker            { return c.config.Load() }
+func (c *epchecker) SetChecker(config Checker)      { c.config.Store(config); c.SetConfig(config.Config) }
+func (c *epchecker) Check(ctx context.Context) bool { return c.Endpoint.Check(ctx, c.GetChecker().Req) }
+
+func (c *epchecker) Unwrap() loadbalancer.Endpoint        { return c.Endpoint }
 func (c *epchecker) GetEndpoint() loadbalancer.Endpoint   { return c.Endpoint }
 func (c *epchecker) SetEndpoint(ep loadbalancer.Endpoint) { c.Endpoint.Update(ep.Info()) }
 
@@ -46,6 +56,12 @@ type Updater interface {
 	UpsertEndpoint(loadbalancer.Endpoint)
 	RemoveEndpoint(epid string)
 	SetEndpointOnline(epid string, online bool)
+}
+
+// Checker is used to check the endpoint.
+type Checker struct {
+	Config checker.Config
+	Req    interface{}
 }
 
 // HealthChecker is a health checker to check whether a set of endpoints
@@ -151,13 +167,22 @@ func (hc *HealthChecker) GetUpdaters() map[string]Updater {
 	return updaters
 }
 
+// ResetChecker resets the checker of all the endpoints.
+func (hc *HealthChecker) ResetChecker(checker Checker) {
+	hc.slock.Lock()
+	defer hc.slock.Unlock()
+	for _, c := range hc.epmaps {
+		c.SetChecker(checker)
+	}
+}
+
 // ResetEndpoints resets all the endpoints to the news.
-func (hc *HealthChecker) ResetEndpoints(news loadbalancer.Endpoints, config checker.Config) {
+func (hc *HealthChecker) ResetEndpoints(news loadbalancer.Endpoints, checker Checker) {
 	hc.slock.Lock()
 	defer hc.slock.Unlock()
 
 	for _, ep := range news {
-		hc.upsertEndpoint(ep, config)
+		hc.upsertEndpoint(ep, checker)
 	}
 
 	for id := range hc.epmaps {
@@ -169,29 +194,29 @@ func (hc *HealthChecker) ResetEndpoints(news loadbalancer.Endpoints, config chec
 }
 
 // UpsertEndpoints adds or updates a set of the endpoints with the same healthcheck config.
-func (hc *HealthChecker) UpsertEndpoints(eps loadbalancer.Endpoints, config checker.Config) {
+func (hc *HealthChecker) UpsertEndpoints(eps loadbalancer.Endpoints, checker Checker) {
 	hc.slock.Lock()
 	defer hc.slock.Unlock()
 	for _, ep := range eps {
-		hc.upsertEndpoint(ep, config)
+		hc.upsertEndpoint(ep, checker)
 	}
 }
 
 // UpsertEndpoint adds or updates the endpoint with the healthcheck config.
-func (hc *HealthChecker) UpsertEndpoint(ep loadbalancer.Endpoint, config checker.Config) {
+func (hc *HealthChecker) UpsertEndpoint(ep loadbalancer.Endpoint, checker Checker) {
 	hc.slock.Lock()
 	defer hc.slock.Unlock()
-	hc.upsertEndpoint(ep, config)
+	hc.upsertEndpoint(ep, checker)
 }
 
-func (hc *HealthChecker) upsertEndpoint(ep loadbalancer.Endpoint, config checker.Config) {
+func (hc *HealthChecker) upsertEndpoint(ep loadbalancer.Endpoint, checker Checker) {
 	id := ep.ID()
 	c, ok := hc.epmaps[id]
 	if ok {
 		c.SetEndpoint(ep)
-		c.SetConfig(config)
+		c.SetChecker(checker)
 	} else {
-		c = newEndpointChecker(hc, ep, config)
+		c = newEndpointChecker(hc, ep, checker)
 		hc.epmaps[id] = c
 		if hc.context != nil { // Has started
 			go c.Start(hc.context)
@@ -242,7 +267,7 @@ func (hc *HealthChecker) GetEndpoint(epid string) (ep EndpointInfo, ok bool) {
 
 	if ok {
 		ep.Online = c.Ok()
-		ep.Config = c.Config()
+		ep.Checker = c.GetChecker()
 		ep.Endpoint = c.GetEndpoint()
 	}
 	return
@@ -256,8 +281,8 @@ var (
 // EndpointInfo represents the information of the endpoint.
 type EndpointInfo struct {
 	loadbalancer.Endpoint
-	Config checker.Config
-	Online bool
+	Checker Checker
+	Online  bool
 }
 
 // Unwrap unwraps the inner endpoint.
@@ -280,7 +305,7 @@ func (hc *HealthChecker) GetEndpoints() []EndpointInfo {
 	for _, c := range hc.epmaps {
 		eps = append(eps, EndpointInfo{
 			Endpoint: c.GetEndpoint(),
-			Config:   c.Config(),
+			Checker:  c.GetChecker(),
 			Online:   c.Ok(),
 		})
 	}
