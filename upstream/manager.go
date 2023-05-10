@@ -36,15 +36,32 @@ type Manager struct {
 }
 
 // NewManager returns a new upstream manager.
-func NewManager() *Manager { return &Manager{ups: make(map[string]*Upstream, 8)} }
+func NewManager() *Manager {
+	m := &Manager{ups: make(map[string]*Upstream, 8)}
+	m.OnAdd(nil)
+	m.OnDel(nil)
+	return m
+}
 
 func (m *Manager) updateUpstreams() { m.upm.Store(maps.Clone(m.ups)) }
 
 // OnAdd sets the callback function, which is called when an upstream is added.
-func (m *Manager) OnAdd(f func(*Upstream)) { m.add.Store(f) }
+func (m *Manager) OnAdd(f func(*Upstream)) {
+	if f == nil {
+		f = onNothing
+	}
+	m.add.Store(f)
+}
 
 // OnDel sets the callback function, which is called when an upstream is deleted.
-func (m *Manager) OnDel(f func(*Upstream)) { m.del.Store(f) }
+func (m *Manager) OnDel(f func(*Upstream)) {
+	if f == nil {
+		f = onNothing
+	}
+	m.del.Store(f)
+}
+
+func onNothing(*Upstream) {}
 
 func (m *Manager) onadd(up *Upstream, ok bool) bool {
 	if ok {
