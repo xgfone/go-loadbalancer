@@ -97,7 +97,7 @@ type Endpoint interface {
 	// Handler
 	Update(info interface{}) error
 	Serve(ctx context.Context, req interface{}) error
-	Check(context.Context) (ok bool)
+	Check(ctx context.Context, req interface{}) (ok bool)
 }
 
 // EndpointWrapper is a wrapper wrapping the backend endpoint.

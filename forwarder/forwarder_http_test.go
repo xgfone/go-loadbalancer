@@ -72,7 +72,7 @@ func TestLoadBalancer(t *testing.T) {
 	if url := ep1.Info().(httpep.Config).URL.String(); url != "http://127.0.0.1:8101" {
 		t.Errorf("expect url '%s', but got '%s'", "http://127.0.0.1:8101", url)
 	}
-	if ok := ep1.Check(context.Background()); !ok {
+	if ok := ep1.Check(context.Background(), nil); !ok {
 		t.Errorf("the endpoint is offline")
 	}
 

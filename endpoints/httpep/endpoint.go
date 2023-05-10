@@ -223,7 +223,8 @@ func (ep *httpEndpoint) Info() interface{}                   { return ep.loadCon
 func (ep *httpEndpoint) Weight() int                         { return ep.loadConf().getWeight(ep) }
 func (ep *httpEndpoint) Status() loadbalancer.EndpointStatus { return ep.loadConf().getStatus(ep) }
 func (ep *httpEndpoint) State() loadbalancer.EndpointState   { return ep.state.Clone() }
-func (ep *httpEndpoint) Check(ctx context.Context) (ok bool) {
+
+func (ep *httpEndpoint) Check(ctx context.Context, r interface{}) (ok bool) {
 	conf := ep.loadConf()
 	req, err := conf.CheckURL.Request(ctx, http.MethodGet)
 	if err != nil {
