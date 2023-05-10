@@ -21,7 +21,11 @@ import (
 	"context"
 
 	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/balancer/roundrobin"
 )
+
+// DefaultBalancer is the default balancer.
+var DefaultBalancer Balancer = roundrobin.NewWeightedBalancer("")
 
 // Forwarder is used to forward the request to one of the backend endpoints.
 type Forwarder interface {
