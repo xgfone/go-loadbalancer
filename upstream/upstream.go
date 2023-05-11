@@ -88,7 +88,7 @@ func (up *Upstream) Discovery() endpoint.Discovery { return up.forwarder.GetEndp
 func (up *Upstream) Timeout() time.Duration { return up.forwarder.GetTimeout() }
 
 // Forwader returns the inner forwarder.
-func (up *Upstream) Forwader() forwarder.Forwarder { return *up.forwarder }
+func (up *Upstream) Forwader() *forwarder.Forwarder { return up.forwarder }
 
 // Options returns the options of the upstream.
 func (up *Upstream) Options() []Option {
