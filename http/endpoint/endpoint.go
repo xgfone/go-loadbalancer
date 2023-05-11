@@ -19,16 +19,17 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"strconv"
 	"sync/atomic"
 	"time"
 
+	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/http/processor"
+	"github.com/xgfone/go-loadbalancer/internal/slog"
 )
 
 // Request represents a upstream request context.
@@ -152,8 +153,11 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 	r.DstReq.RequestURI = ""
 	r.DstReq.URL.Host = s.id
 
+	start := time.Now()
+	var statusCode int
 	resp, err := s.do(r.DstReq)
 	if resp != nil {
+		statusCode = resp.StatusCode
 		defer resp.Body.Close()
 	}
 
@@ -165,14 +169,50 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 		}
 	}
 
+	cost := time.Since(start)
 	if err == nil {
 		s.state.IncSuccess()
-		// TODO: log
+		if slog.Enabled(ctx, slog.LevelDebug) {
+			slog.Debug("forward the http request to the backend http endpoint",
+				"epid", s.id,
+				"reqid", defaults.GetRequestID(ctx, r),
+				"srcreq", map[string]string{
+					"raddr":  r.SrcReq.RemoteAddr,
+					"method": r.SrcReq.Method,
+					"host":   r.SrcReq.Host,
+					"uri":    r.SrcReq.RequestURI,
+				},
+				"dstreq", map[string]interface{}{
+					"method": r.DstReq.Method,
+					"host":   r.DstReq.Host,
+					"uri":    r.DstReq.URL.Path,
+					"code":   statusCode,
+				},
+				"start", start.Unix(),
+				"cost", cost.String(),
+			)
+		}
 	} else {
-		// TODO: log
+		slog.Error("forward the http request to the backend http endpoint",
+			"epid", s.id,
+			"reqid", defaults.GetRequestID(ctx, req),
+			"srcreq", map[string]string{
+				"raddr":  r.SrcReq.RemoteAddr,
+				"method": r.SrcReq.Method,
+				"host":   r.SrcReq.Host,
+				"uri":    r.SrcReq.RequestURI,
+			},
+			"dstreq", map[string]interface{}{
+				"method": r.DstReq.Method,
+				"host":   r.DstReq.Host,
+				"uri":    r.DstReq.URL.Path,
+				"code":   statusCode,
+			},
+			"start", start.Unix(),
+			"cost", cost.String(),
+			"err", err,
+		)
 	}
-
-	log.Printf("forward request to %s, %d", s.id, resp.StatusCode)
 
 	return
 }
@@ -203,7 +243,7 @@ func (s *server) checkHTTP(req *http.Request) (ok bool) {
 	req.RequestURI = ""
 	req.URL.Host = s.id
 	resp, err := s.do(req)
-	ok = err == nil
+	ok = err == nil && resp.StatusCode < 500
 	if resp != nil {
 		resp.Body.Close()
 	}
