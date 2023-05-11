@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package loadbalancer_test
+package endpoint_test
 
 import (
 	"sort"
 	"testing"
 
-	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
@@ -30,7 +30,7 @@ func TestEndpoints(t *testing.T) {
 	ep5 := tests.NewEndpoint("192.168.1.5", 2)
 	ep6 := tests.NewEndpoint("192.168.1.6", 2)
 
-	eps := loadbalancer.Endpoints{ep1, ep2, ep3, ep4, ep5, ep6}
+	eps := endpoint.Endpoints{ep1, ep2, ep3, ep4, ep5, ep6}
 	sort.Stable(eps)
 
 	expects := []string{

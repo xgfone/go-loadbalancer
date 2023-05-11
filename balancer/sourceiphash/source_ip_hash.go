@@ -22,6 +22,7 @@ import (
 
 	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/internal/random"
 )
 
@@ -51,7 +52,7 @@ func NewBalancer(policy string) *Balancer {
 func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *Balancer) Forward(c context.Context, r interface{}, sd loadbalancer.EndpointDiscovery) error {
+func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) error {
 	eps := sd.OnEndpoints()
 	_len := len(eps)
 	switch _len {

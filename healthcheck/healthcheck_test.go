@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
@@ -27,7 +27,7 @@ type testUpdater struct{ eps sync.Map }
 
 func newUpdater() *testUpdater { return &testUpdater{} }
 
-func (u *testUpdater) UpsertEndpoint(ep loadbalancer.Endpoint)  { u.eps.Store(ep.ID(), false) }
+func (u *testUpdater) UpsertEndpoint(ep endpoint.Endpoint)      { u.eps.Store(ep.ID(), false) }
 func (u *testUpdater) RemoveEndpoint(id string)                 { u.eps.Delete(id) }
 func (u *testUpdater) SetEndpointOnline(id string, online bool) { u.eps.Store(id, online) }
 func (u *testUpdater) Endpoints() map[string]bool {

@@ -1,4 +1,4 @@
-// Copyright 2023 xgfone
+// Copyright 2021~2023 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,24 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tests
+// Package loadbalancer provides some common functions.
+package loadbalancer
 
 import "testing"
 
-func TestNewEndpoint(t *testing.T) {
-	ep := NewEndpoint("1.2.3.4", 1)
-	ep.current = 0
-	ep.Serve(nil, nil)
-	ep.Serve(nil, nil)
+func TestNewError(t *testing.T) {
+	if err := NewError(true, nil); err != nil {
+		t.Errorf("expect nil, but got %v", err)
+	}
 
-	state := ep.State()
-	if state.Total != 2 {
-		t.Errorf("expect total=%d, but got %d", 2, state.Total)
-	}
-	if state.Success != 2 {
-		t.Errorf("expect success=%d, but got %d", 2, state.Success)
-	}
-	if state.Current != 0 {
-		t.Errorf("expect current=%d, but got %d", 0, state.Current)
+	switch err := NewError(true, ErrNoAvailableEndpoints).(type) {
+	case retryError:
+		if !err.Retry() {
+			t.Errorf("expect retry is true, but got false")
+		}
+		if e := err.Unwrap(); e != ErrNoAvailableEndpoints {
+			t.Errorf("expect error '%s', but got '%v'", ErrNoAvailableEndpoints, e)
+		}
+
+	default:
+		t.Errorf("expect a retry error, but got %T", err)
 	}
 }

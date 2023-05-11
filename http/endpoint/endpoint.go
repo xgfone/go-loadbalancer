@@ -67,7 +67,7 @@ type Config struct {
 	Port uint16
 
 	Weight    int
-	GetWeight func(loadbalancer.Endpoint) int
+	GetWeight func(endpoint.Endpoint) int
 
 	Client *http.Client
 }
@@ -80,7 +80,7 @@ func (c Config) ID() string {
 //
 // For the method Serve, req must be Request.
 // For the method Check, req must be one of *http.Request, Request, or nil.
-func (c Config) NewEndpoint() loadbalancer.WeightedEndpoint {
+func (c Config) NewEndpoint() endpoint.WeightedEndpoint {
 	if c.IP == "" {
 		panic("HttpEndpoint: ip must not be empty")
 	}
@@ -95,14 +95,14 @@ func (c Config) NewEndpoint() loadbalancer.WeightedEndpoint {
 type server struct {
 	id    string
 	conf  atomic.Value
-	state loadbalancer.EndpointState
+	state endpoint.State
 	endpoint.StatusManager
 }
 
 func newServer(id string, conf Config) *server {
 	s := new(server)
 	s.setConf(conf)
-	s.SetStatus(loadbalancer.EndpointStatusOnline)
+	s.SetStatus(endpoint.StatusOnline)
 	s.id = id
 	return s
 }
@@ -112,11 +112,11 @@ func (s *server) String() string { return s.id }
 func (s *server) getConf() Config        { return s.conf.Load().(Config) }
 func (s *server) setConf(c Config) error { s.conf.Store(c); return nil }
 
-func (s *server) ID() string                        { return s.id }
-func (s *server) Type() string                      { return "http" }
-func (s *server) Info() interface{}                 { return s.getConf() }
-func (s *server) Update(info interface{}) error     { return s.setConf(info.(Config)) }
-func (s *server) State() loadbalancer.EndpointState { return s.state.Clone() }
+func (s *server) ID() string                    { return s.id }
+func (s *server) Type() string                  { return "http" }
+func (s *server) Info() interface{}             { return s.getConf() }
+func (s *server) Update(info interface{}) error { return s.setConf(info.(Config)) }
+func (s *server) State() endpoint.State         { return s.state.Clone() }
 
 func (s *server) Weight() int {
 	if conf := s.getConf(); conf.GetWeight != nil {

@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 
 	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
 // Balancer implements the balancer based on the roundrobin policy.
@@ -45,7 +46,7 @@ func NewBalancer(policy string) *Balancer {
 func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *Balancer) Forward(c context.Context, r interface{}, sd loadbalancer.EndpointDiscovery) error {
+func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) error {
 	eps := sd.OnEndpoints()
 	switch _len := len(eps); _len {
 	case 0:
@@ -86,7 +87,7 @@ func NewWeightedBalancer(policy string) *WeightedBalancer {
 func (b *WeightedBalancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *WeightedBalancer) Forward(c context.Context, r interface{}, sd loadbalancer.EndpointDiscovery) error {
+func (b *WeightedBalancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) error {
 	eps := sd.OnEndpoints()
 	switch len(eps) {
 	case 0:
@@ -98,14 +99,14 @@ func (b *WeightedBalancer) Forward(c context.Context, r interface{}, sd loadbala
 	}
 }
 
-func (b *WeightedBalancer) selectNextEndpoint(eps loadbalancer.Endpoints) loadbalancer.Endpoint {
+func (b *WeightedBalancer) selectNextEndpoint(eps endpoint.Endpoints) endpoint.Endpoint {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
 	var total int
 	var selected *weightedEndpoint
 	for i, _len := 0, len(eps); i < _len; i++ {
-		weight := loadbalancer.GetEndpointWeight(eps[i])
+		weight := endpoint.GetWeight(eps[i])
 		total += weight
 
 		id := eps[i].ID()
@@ -137,6 +138,6 @@ func (b *WeightedBalancer) selectNextEndpoint(eps loadbalancer.Endpoints) loadba
 }
 
 type weightedEndpoint struct {
-	loadbalancer.Endpoint
+	endpoint.Endpoint
 	CurrentWeight int
 }

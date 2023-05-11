@@ -65,7 +65,7 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build the upstream backend servers.
-	endpoints := make(loadbalancer.Endpoints, len(req.Upstream.Servers))
+	endpoints := make(endpoint.Endpoints, len(req.Upstream.Servers))
 	for i, server := range req.Upstream.Servers {
 		config := httpep.Config{URL: req.Upstream.ForwardURL}
 		config.StaticWeight = server.Weight

@@ -17,34 +17,35 @@ package tests
 import (
 	"context"
 
-	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
-type endpoint struct {
+var _ endpoint.Endpoint = new(TestEndpoint)
+
+type TestEndpoint struct {
 	ip      string
-	state   loadbalancer.EndpointState
-	status  loadbalancer.EndpointStatus
+	state   endpoint.State
 	weight  int
 	current uint64
+
+	endpoint.StatusManager
 }
 
-func (ep *endpoint) String() string                          { return ep.ip }
-func (ep *endpoint) Weight() int                             { return ep.weight }
-func (ep *endpoint) ID() string                              { return ep.ip }
-func (ep *endpoint) Type() string                            { return "" }
-func (ep *endpoint) Info() interface{}                       { return nil }
-func (ep *endpoint) Update(info interface{}) error           { return nil }
-func (ep *endpoint) SetStatus(s loadbalancer.EndpointStatus) { ep.status = s }
-func (ep *endpoint) Status() loadbalancer.EndpointStatus     { return ep.status }
-func (ep *endpoint) Check(context.Context, interface{}) bool { return true }
-func (ep *endpoint) State() loadbalancer.EndpointState {
+func (ep *TestEndpoint) String() string                          { return ep.ip }
+func (ep *TestEndpoint) Weight() int                             { return ep.weight }
+func (ep *TestEndpoint) ID() string                              { return ep.ip }
+func (ep *TestEndpoint) Type() string                            { return "" }
+func (ep *TestEndpoint) Info() interface{}                       { return nil }
+func (ep *TestEndpoint) Update(info interface{}) error           { return nil }
+func (ep *TestEndpoint) Check(context.Context, interface{}) bool { return true }
+func (ep *TestEndpoint) State() endpoint.State {
 	state := ep.state.Clone()
 	if ep.current > 0 {
 		state.Current = ep.current
 	}
 	return state
 }
-func (ep *endpoint) Serve(c context.Context, r interface{}) error {
+func (ep *TestEndpoint) Serve(c context.Context, r interface{}) error {
 	ep.state.IncSuccess()
 	ep.state.Inc()
 	ep.state.Dec()
@@ -52,8 +53,8 @@ func (ep *endpoint) Serve(c context.Context, r interface{}) error {
 }
 
 // NewEndpoint returns a new endpoint to do the test.
-func NewEndpoint(ip string, weight int) loadbalancer.Endpoint {
-	ep := &endpoint{ip: ip, weight: weight, current: uint64(weight)}
-	ep.SetStatus(loadbalancer.EndpointStatusOnline)
+func NewEndpoint(ip string, weight int) *TestEndpoint {
+	ep := &TestEndpoint{ip: ip, weight: weight, current: uint64(weight)}
+	ep.SetStatus(endpoint.StatusOnline)
 	return ep
 }

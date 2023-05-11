@@ -20,15 +20,14 @@ import (
 	"sync/atomic"
 
 	"github.com/xgfone/go-generics/slices"
-	"github.com/xgfone/go-loadbalancer"
 )
 
-var _ loadbalancer.EndpointDiscovery = new(Manager)
+var _ Discovery = new(Manager)
 
 // Manager is used to manage a group of endpoints.
 type Manager struct {
 	lock sync.RWMutex
-	eps  map[string]loadbalancer.Endpoint
+	eps  map[string]Endpoint
 
 	oneps  atomic.Value
 	offeps atomic.Value
@@ -37,35 +36,35 @@ type Manager struct {
 
 // NewManager returns a new endpoint manager.
 func NewManager() *Manager {
-	m := &Manager{eps: make(map[string]loadbalancer.Endpoint, 8)}
-	m.alleps.Store(loadbalancer.Endpoints{})
-	m.offeps.Store(loadbalancer.Endpoints{})
-	m.oneps.Store(loadbalancer.Endpoints{})
+	m := &Manager{eps: make(map[string]Endpoint, 8)}
+	m.alleps.Store(Endpoints{})
+	m.offeps.Store(Endpoints{})
+	m.oneps.Store(Endpoints{})
 	return m
 }
 
-// OnlineNum implements the interface EndpointDiscovery#OnlineNum.
+// OnlineNum implements the interface Discovery#OnlineNum.
 func (m *Manager) OnlineNum() int {
 	return len(m.OnEndpoints())
 }
 
-// OnEndpoints implements the interface EndpointDiscovery#OnEndpoints.
-func (m *Manager) OnEndpoints() loadbalancer.Endpoints {
-	return m.oneps.Load().(loadbalancer.Endpoints)
+// OnEndpoints implements the interface Discovery#OnEndpoints.
+func (m *Manager) OnEndpoints() Endpoints {
+	return m.oneps.Load().(Endpoints)
 }
 
-// OffEndpoints implements the interface EndpointDiscovery#OffEndpoints.
-func (m *Manager) OffEndpoints() loadbalancer.Endpoints {
-	return m.offeps.Load().(loadbalancer.Endpoints)
+// OffEndpoints implements the interface Discovery#OffEndpoints.
+func (m *Manager) OffEndpoints() Endpoints {
+	return m.offeps.Load().(Endpoints)
 }
 
-// AllEndpoints implements the interface EndpointDiscovery#AllEndpoints.
-func (m *Manager) AllEndpoints() loadbalancer.Endpoints {
-	return m.alleps.Load().(loadbalancer.Endpoints)
+// AllEndpoints implements the interface Discovery#AllEndpoints.
+func (m *Manager) AllEndpoints() Endpoints {
+	return m.alleps.Load().(Endpoints)
 }
 
 // SetEndpointStatus sets the status of the endpoint.
-func (m *Manager) SetEndpointStatus(epid string, status loadbalancer.EndpointStatus) {
+func (m *Manager) SetEndpointStatus(epid string, status Status) {
 	if ep, ok := m.GetEndpoint(epid); ok {
 		ep.SetStatus(status)
 
@@ -76,7 +75,7 @@ func (m *Manager) SetEndpointStatus(epid string, status loadbalancer.EndpointSta
 }
 
 // SetEndpointStatuses sets the statuses of a group of endpoints.
-func (m *Manager) SetEndpointStatuses(epid2statuses map[string]loadbalancer.EndpointStatus) {
+func (m *Manager) SetEndpointStatuses(epid2statuses map[string]Status) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -94,7 +93,7 @@ func (m *Manager) SetEndpointStatuses(epid2statuses map[string]loadbalancer.Endp
 }
 
 // GetEndpoint returns the endpoint by the id.
-func (m *Manager) GetEndpoint(epid string) (ep loadbalancer.Endpoint, ok bool) {
+func (m *Manager) GetEndpoint(epid string) (ep Endpoint, ok bool) {
 	m.lock.RLock()
 	ep, ok = m.eps[epid]
 	m.lock.RUnlock()
@@ -102,7 +101,7 @@ func (m *Manager) GetEndpoint(epid string) (ep loadbalancer.Endpoint, ok bool) {
 }
 
 // ResetEndpoints resets all the endpoints to the news.
-func (m *Manager) ResetEndpoints(news ...loadbalancer.Endpoint) {
+func (m *Manager) ResetEndpoints(news ...Endpoint) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -115,7 +114,7 @@ func (m *Manager) ResetEndpoints(news ...loadbalancer.Endpoint) {
 	}
 
 	for id := range m.eps {
-		index := slices.IndexFunc(news, func(ep loadbalancer.Endpoint) bool { return ep.ID() == id })
+		index := slices.IndexFunc(news, func(ep Endpoint) bool { return ep.ID() == id })
 		if index == -1 { // Not Exist, and Delete
 			delete(m.eps, id)
 		}
@@ -125,7 +124,7 @@ func (m *Manager) ResetEndpoints(news ...loadbalancer.Endpoint) {
 }
 
 // UpsertEndpoints adds or updates the endpoints.
-func (m *Manager) UpsertEndpoints(eps ...loadbalancer.Endpoint) {
+func (m *Manager) UpsertEndpoints(eps ...Endpoint) {
 	if len(eps) == 0 {
 		return
 	}
@@ -155,15 +154,15 @@ func (m *Manager) RemoveEndpoint(epid string) {
 }
 
 func (m *Manager) updateEndpoints() {
-	oneps := loadbalancer.AcquireEndpoints(len(m.eps))
-	alleps := loadbalancer.AcquireEndpoints(len(m.eps))
-	offeps := loadbalancer.AcquireEndpoints(0)
+	oneps := Acquire(len(m.eps))
+	alleps := Acquire(len(m.eps))
+	offeps := Acquire(0)
 	for _, ep := range m.eps {
 		alleps = append(alleps, ep)
 		switch ep.Status() {
-		case loadbalancer.EndpointStatusOnline:
+		case StatusOnline:
 			oneps = append(oneps, ep)
-		case loadbalancer.EndpointStatusOffline:
+		case StatusOffline:
 			offeps = append(offeps, ep)
 		}
 	}
@@ -174,14 +173,14 @@ func (m *Manager) updateEndpoints() {
 }
 
 func (m *Manager) updateEndpointsStatus() {
-	oneps := loadbalancer.AcquireEndpoints(len(m.eps))
-	offeps := loadbalancer.AcquireEndpoints(0)
+	oneps := Acquire(len(m.eps))
+	offeps := Acquire(0)
 
 	for _, ep := range m.AllEndpoints() {
 		switch ep.Status() {
-		case loadbalancer.EndpointStatusOnline:
+		case StatusOnline:
 			oneps = append(oneps, ep)
-		case loadbalancer.EndpointStatusOffline:
+		case StatusOffline:
 			offeps = append(offeps, ep)
 		}
 	}
@@ -190,14 +189,14 @@ func (m *Manager) updateEndpointsStatus() {
 	swapEndpoints(&m.offeps, offeps) // For offline
 }
 
-func swapEndpoints(dsteps *atomic.Value, neweps loadbalancer.Endpoints) {
+func swapEndpoints(dsteps *atomic.Value, neweps Endpoints) {
 	if len(neweps) == 0 {
-		oldeps := dsteps.Swap(loadbalancer.Endpoints{}).(loadbalancer.Endpoints)
-		loadbalancer.ReleaseEndpoints(oldeps)
-		loadbalancer.ReleaseEndpoints(neweps)
+		oldeps := dsteps.Swap(Endpoints{}).(Endpoints)
+		Release(oldeps)
+		Release(neweps)
 	} else {
 		sort.Stable(neweps)
-		oldeps := dsteps.Swap(neweps).(loadbalancer.Endpoints)
-		loadbalancer.ReleaseEndpoints(oldeps)
+		oldeps := dsteps.Swap(neweps).(Endpoints)
+		Release(oldeps)
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"sort"
 
 	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
 // Balancer implements the balancer based on the least number of the connection.
@@ -39,23 +40,23 @@ func NewBalancer(policy string) *Balancer {
 func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *Balancer) Forward(c context.Context, r interface{}, sd loadbalancer.EndpointDiscovery) error {
+func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) error {
 	switch eps := sd.OnEndpoints(); len(eps) {
 	case 0:
 		return loadbalancer.ErrNoAvailableEndpoints
 	case 1:
 		return eps[0].Serve(c, r)
 	default:
-		endpoints := loadbalancer.AcquireEndpoints(len(eps))
+		endpoints := endpoint.Acquire(len(eps))
 		endpoints = append(endpoints, eps...)
 		sort.Stable(leastConnEndpoints(endpoints))
-		endpoint := endpoints[0]
-		loadbalancer.ReleaseEndpoints(endpoints)
-		return endpoint.Serve(c, r)
+		ep := endpoints[0]
+		endpoint.Release(endpoints)
+		return ep.Serve(c, r)
 	}
 }
 
-type leastConnEndpoints loadbalancer.Endpoints
+type leastConnEndpoints endpoint.Endpoints
 
 func (eps leastConnEndpoints) Len() int      { return len(eps) }
 func (eps leastConnEndpoints) Swap(i, j int) { eps[i], eps[j] = eps[j], eps[i] }

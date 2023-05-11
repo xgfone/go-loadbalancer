@@ -28,8 +28,8 @@ import (
 )
 
 var (
-	_ healthcheck.Updater            = &Forwarder{}
-	_ loadbalancer.EndpointDiscovery = &Forwarder{}
+	_ healthcheck.Updater = &Forwarder{}
+	_ endpoint.Discovery  = &Forwarder{}
 )
 
 // Forwarder is used to forward the request to one of the backend endpoints.
@@ -37,7 +37,7 @@ type Forwarder struct {
 	name      string
 	timeout   int64
 	balancer  atomicvalue.Value[balancer.Balancer]
-	discovery atomicvalue.Value[loadbalancer.EndpointDiscovery]
+	discovery atomicvalue.Value[endpoint.Discovery]
 
 	epmanager *endpoint.Manager
 	httperror HTTPErrorHandler
@@ -60,7 +60,7 @@ func NewForwarder(name string, balancer balancer.Balancer) *Forwarder {
 // Name reutrns the name of the forwarder.
 func (f *Forwarder) Name() string { return f.name }
 
-// Type reutrns the type of the forwarder, that's loadbalancer.
+// Type reutrns the type of the forwarder, that's "loadbalancer".
 func (f *Forwarder) Type() string { return "loadbalancer" }
 
 // GetBalancer returns the balancer.
@@ -86,7 +86,7 @@ func (f *Forwarder) SetTimeout(timeout time.Duration) {
 // GetEndpointDiscovery returns the endpoint discovery.
 //
 // If not set the endpoint discovery, return nil.
-func (f *Forwarder) GetEndpointDiscovery() (sd loadbalancer.EndpointDiscovery) {
+func (f *Forwarder) GetEndpointDiscovery() (sd endpoint.Discovery) {
 	return f.discovery.Load()
 }
 
@@ -95,13 +95,13 @@ func (f *Forwarder) GetEndpointDiscovery() (sd loadbalancer.EndpointDiscovery) {
 //
 // If sd is equal to nil, it will cancel the endpoint discovery.
 // Or, use the endpoint discovery instead of the direct endpoints.
-func (f *Forwarder) SwapEndpointDiscovery(new loadbalancer.EndpointDiscovery) (old loadbalancer.EndpointDiscovery) {
+func (f *Forwarder) SwapEndpointDiscovery(new endpoint.Discovery) (old endpoint.Discovery) {
 	old = f.discovery.Swap(new)
 	// f.ResetEndpoints() // We need to clear all the endpoints??
 	return
 }
 
-// Serve implement the interface loadbalancer.Endpoint#Serve,
+// Serve implement the interface endpoint.Endpoint#Serve,
 // which will forward the request to one of the backend endpoints.
 //
 // req should have implemented one of the interfaces:
@@ -130,12 +130,12 @@ func (f *Forwarder) Serve(ctx context.Context, req interface{}) error {
 }
 
 // SetEndpointOnline implements the interface healthcheck.Updater#SetEndpointOnline
-// to set the status of the endpoint to EndpointStatusOnline or EndpointStatusOffline.
+// to set the status of the endpoint to endpoint.StatusOnline or endpoint.StatusOffline.
 func (f *Forwarder) SetEndpointOnline(epid string, online bool) {
 	if online {
-		f.SetEndpointStatus(epid, loadbalancer.EndpointStatusOnline)
+		f.SetEndpointStatus(epid, endpoint.StatusOnline)
 	} else {
-		f.SetEndpointStatus(epid, loadbalancer.EndpointStatusOffline)
+		f.SetEndpointStatus(epid, endpoint.StatusOffline)
 	}
 }
 
@@ -143,7 +143,7 @@ func (f *Forwarder) SetEndpointOnline(epid string, online bool) {
 // which does nothing if the endpoint does not exist.
 //
 // This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) SetEndpointStatus(epid string, status loadbalancer.EndpointStatus) {
+func (f *Forwarder) SetEndpointStatus(epid string, status endpoint.Status) {
 	f.epmanager.SetEndpointStatus(epid, status)
 }
 
@@ -151,31 +151,29 @@ func (f *Forwarder) SetEndpointStatus(epid string, status loadbalancer.EndpointS
 // which does nothing if the endpoint does not exist.
 //
 // This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) SetEndpointStatuses(statuses map[string]loadbalancer.EndpointStatus) {
+func (f *Forwarder) SetEndpointStatuses(statuses map[string]endpoint.Status) {
 	f.epmanager.SetEndpointStatuses(statuses)
 }
 
-// ResetEndpoints resets all the endpoints to endpoints with EndpointStatusOnline.
+// ResetEndpoints resets all the endpoints to eps.
 //
 // This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) ResetEndpoints(eps ...loadbalancer.Endpoint) {
+func (f *Forwarder) ResetEndpoints(eps ...endpoint.Endpoint) {
 	f.epmanager.ResetEndpoints(eps...)
 }
 
 // UpsertEndpoints adds or updates the endpoints.
 //
-// Notice: the statuses of all the given new endpoints are EndpointStatusOnline.
-//
 // This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) UpsertEndpoints(eps ...loadbalancer.Endpoint) {
+func (f *Forwarder) UpsertEndpoints(eps ...endpoint.Endpoint) {
 	f.epmanager.UpsertEndpoints(eps...)
 }
 
-// UpsertEndpoint adds or updates the given endpoint with EndpointStatusOnline.
+// UpsertEndpoint adds or updates the given endpoint.
 //
 // This is the inner endpoint management of the loadbalancer forwarder,
 // which implements the interface healthcheck.Updater#UpsertEndpoint.
-func (f *Forwarder) UpsertEndpoint(ep loadbalancer.Endpoint) {
+func (f *Forwarder) UpsertEndpoint(ep endpoint.Endpoint) {
 	f.epmanager.UpsertEndpoints(ep)
 }
 
@@ -191,36 +189,36 @@ func (f *Forwarder) RemoveEndpoint(epid string) {
 // GetEndpoint returns the endpoint by the endpoint id.
 //
 // This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) GetEndpoint(epid string) (ep loadbalancer.Endpoint, ok bool) {
+func (f *Forwarder) GetEndpoint(epid string) (ep endpoint.Endpoint, ok bool) {
 	return f.epmanager.GetEndpoint(epid)
 }
 
-// OnlineNum implements the interfce loadbalancer.EndpointDiscovery#OnlineNum
+// OnlineNum implements the interfce endpoint.Discovery#OnlineNum
 // to return the number of the online endpoints.
 func (f *Forwarder) OnlineNum() int {
 	return f.epmanager.OnlineNum()
 }
 
-// OnEndpoints implements the inerface loadbalancer.EndpointDiscovery#OnEndpoints
+// OnEndpoints implements the inerface endpoint.Discovery#OnEndpoints
 // to only return all the online endpoints.
 //
 // This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) OnEndpoints() loadbalancer.Endpoints {
+func (f *Forwarder) OnEndpoints() endpoint.Endpoints {
 	return f.epmanager.OnEndpoints()
 }
 
-// OffEndpoints implements the inerface loadbalancer.EndpointDiscovery#OffEndpoints
+// OffEndpoints implements the inerface endpoint.Discovery#OffEndpoints
 // to only return all the offline endpoints.
 //
 // This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) OffEndpoints() loadbalancer.Endpoints {
+func (f *Forwarder) OffEndpoints() endpoint.Endpoints {
 	return f.epmanager.OffEndpoints()
 }
 
-// AllEndpoints implements the inerface loadbalancer.EndpointDiscovery#OnEndpoints
+// AllEndpoints implements the inerface endpoint.Discovery#OnEndpoints
 // to return all the endpoints.
 //
 // This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) AllEndpoints() loadbalancer.Endpoints {
+func (f *Forwarder) AllEndpoints() endpoint.Endpoints {
 	return f.epmanager.AllEndpoints()
 }

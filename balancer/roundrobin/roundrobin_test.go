@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
@@ -34,7 +34,7 @@ func TestWeightedRoundRobin(t *testing.T) {
 	ep1 := tests.NewEndpoint("127.0.0.1", 1)
 	ep2 := tests.NewEndpoint("127.0.0.2", 2)
 	ep3 := tests.NewEndpoint("127.0.0.3", 3)
-	eps := loadbalancer.Endpoints{ep1, ep2, ep3}
+	eps := endpoint.Endpoints{ep1, ep2, ep3}
 
 	balancer := NewWeightedBalancer("")
 	for i := 0; i < 18; i++ {

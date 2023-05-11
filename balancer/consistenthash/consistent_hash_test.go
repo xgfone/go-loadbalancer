@@ -21,12 +21,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
 func TestBalancer(t *testing.T) {
-	eps := loadbalancer.Endpoints{
+	eps := endpoint.Endpoints{
 		tests.NewEndpoint("1.2.3.4:8000", 1),
 		tests.NewEndpoint("1.2.3.4:8080", 1),
 		tests.NewEndpoint("5.6.7.8:8000", 1),

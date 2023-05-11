@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package endpoint
+package endpoint_test
 
 import (
 	"testing"
 
-	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
 func TestManager(t *testing.T) {
-	m := NewManager()
+	m := endpoint.NewManager()
 
 	m.UpsertEndpoints(
 		tests.NewEndpoint("1.2.3.4", 1),
@@ -34,23 +34,23 @@ func TestManager(t *testing.T) {
 		t.Errorf("expect %d, but got %d", 3, num)
 	}
 
-	m.SetEndpointStatus("1.2.3.4", loadbalancer.EndpointStatusOffline)
+	m.SetEndpointStatus("1.2.3.4", endpoint.StatusOffline)
 	if num := m.OnlineNum(); num != 2 {
 		t.Errorf("expect %d, but got %d: %v", 2, num, m.OnEndpoints())
 	}
 
-	m.SetEndpointStatus("1.2.3.5", loadbalancer.EndpointStatusOffline)
+	m.SetEndpointStatus("1.2.3.5", endpoint.StatusOffline)
 	if num := m.OnlineNum(); num != 1 {
 		t.Errorf("expect %d, but got %d", 1, num)
 	}
 
-	m.SetEndpointStatus("1.2.3.6", loadbalancer.EndpointStatusOffline)
+	m.SetEndpointStatus("1.2.3.6", endpoint.StatusOffline)
 	if num := m.OnlineNum(); num != 0 {
 		t.Errorf("expect %d, but got %d", 0, num)
 	}
 
-	for _, ep := range m.eps {
-		if ep.Status() != loadbalancer.EndpointStatusOffline {
+	for _, ep := range m.AllEndpoints() {
+		if ep.Status() != endpoint.StatusOffline {
 			t.Errorf("expect endpoint status %s", ep.Status())
 		}
 	}

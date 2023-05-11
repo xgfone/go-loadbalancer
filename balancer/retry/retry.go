@@ -22,6 +22,7 @@ import (
 
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
 var _ balancer.Balancer = Retry{}
@@ -43,7 +44,7 @@ func NewRetry(balancer balancer.Balancer, interval time.Duration, maxNum int) Re
 }
 
 // Forward overrides the Forward method.
-func (b Retry) Forward(c context.Context, r interface{}, sd loadbalancer.EndpointDiscovery) (err error) {
+func (b Retry) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (err error) {
 	eps := sd.OnEndpoints()
 	_len := len(eps)
 	switch _len {

@@ -17,8 +17,8 @@ package upstream
 
 import (
 	"github.com/xgfone/go-atomicvalue"
-	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/forwarder"
 	"github.com/xgfone/go-loadbalancer/healthcheck"
 )
@@ -43,7 +43,7 @@ func SetHealthCheck(checker healthcheck.Checker) Option {
 }
 
 // SetEndpoints returns an upstream option to set all the endpoints.
-func SetEndpoints(eps ...loadbalancer.Endpoint) Option {
+func SetEndpoints(eps ...endpoint.Endpoint) Option {
 	return func(u *Upstream) { u.healthcheck.ResetEndpoints(eps, u.Checker()) }
 }
 
@@ -78,7 +78,7 @@ func (up *Upstream) Policy() string { return up.forwarder.GetBalancer().Policy()
 func (up *Upstream) Checker() healthcheck.Checker { return up.checkerconf.Load() }
 
 // Endpoints returns all the backend endpoints.
-func (up *Upstream) Endpoints() loadbalancer.Endpoints { return up.forwarder.AllEndpoints() }
+func (up *Upstream) Endpoints() endpoint.Endpoints { return up.forwarder.AllEndpoints() }
 
 // Forwader returns the inner forwarder.
 func (up *Upstream) Forwader() forwarder.Forwarder { return *up.forwarder }

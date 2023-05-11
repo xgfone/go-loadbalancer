@@ -1,4 +1,4 @@
-// Copyright 2023 xgfone
+// Copyright 2021~2023 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package loadbalancer provides some common functions.
 package loadbalancer
+
+import "errors"
+
+// ErrNoAvailableEndpoints is used to represents no available endpoints.
+var ErrNoAvailableEndpoints = errors.New("no available endpoints")
 
 // RetryError represents a no-retry error.
 type RetryError interface {
