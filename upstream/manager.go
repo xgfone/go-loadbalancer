@@ -19,7 +19,6 @@ import (
 
 	"github.com/xgfone/go-atomicvalue"
 	"github.com/xgfone/go-generics/maps"
-	"github.com/xgfone/go-loadbalancer/balancer"
 )
 
 // DefaultManager is the default upstream manager.
@@ -140,7 +139,7 @@ func (m *Manager) ResetUpstreams(upstreams map[string][]Option) {
 		if up, ok := m.ups[name]; ok {
 			up.Update(options...)
 		} else {
-			up := NewUpstream(name, balancer.DefaultBalancer, options...)
+			up := NewUpstream(name, options...)
 			m.ups[name] = up
 			m.onadd(up, true)
 		}

@@ -16,54 +16,58 @@
 package upstream
 
 import (
+	"time"
+
 	"github.com/xgfone/go-atomicvalue"
 	"github.com/xgfone/go-loadbalancer/balancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/forwarder"
-	"github.com/xgfone/go-loadbalancer/healthcheck"
 )
 
 // Option is used to configure the upstream.
 type Option func(*Upstream)
 
+// SetContextData returns an upstream option to set the context data.
+func SetContextData(contextData interface{}) Option {
+	return func(u *Upstream) { u.context.Store(contextData) }
+}
+
 // SetBalancer returns an upstream option to set the balancer.
 func SetBalancer(balancer balancer.Balancer) Option {
 	if balancer == nil {
-		panic("upstream balancer must not be nil")
+		panic("Upstream: balancer must not be nil")
 	}
 	return func(u *Upstream) { u.forwarder.SwapBalancer(balancer) }
 }
 
-// SetHealthCheck returns an upstream option to set the healthcheck config
-// of all the backend endpoints.
-//
-// NOTICE: it should be set before SetEndpoints.
-func SetHealthCheck(checker healthcheck.Checker) Option {
-	return func(u *Upstream) { u.checkerconf.Store(checker) }
+func SetTimeout(timeout time.Duration) Option {
+	if timeout < 0 {
+		panic("Upstream: timeout must not be negative")
+	}
+	return func(u *Upstream) { u.forwarder.SetTimeout(timeout) }
 }
 
-// SetEndpoints returns an upstream option to set all the endpoints.
-func SetEndpoints(eps ...endpoint.Endpoint) Option {
-	return func(u *Upstream) { u.healthcheck.ResetEndpoints(eps, u.Checker()) }
+// SetDiscovery sets the endpoint discovery.
+func SetDiscovery(discovery endpoint.Discovery) Option {
+	if discovery == nil {
+		panic("Upstream: the endpoint discovery must not be nil")
+	}
+	return func(u *Upstream) { u.forwarder.SwapEndpointDiscovery(discovery) }
 }
 
 // Upstream represents an upstream to manage the backend endpoints.
 type Upstream struct {
-	forwarder   *forwarder.Forwarder
-	healthcheck *healthcheck.HealthChecker
-	checkerconf atomicvalue.Value[healthcheck.Checker]
+	forwarder *forwarder.Forwarder
+	context   atomicvalue.Value[interface{}]
 }
 
-// NewUpstream returns a new upstream.
-func NewUpstream(name string, balancer balancer.Balancer, options ...Option) *Upstream {
+// NewUpstream returns a new upstream with balancer.DefaultBalancer.
+func NewUpstream(name string, options ...Option) *Upstream {
 	if name == "" {
-		panic("the upstream name must not be empty")
+		panic("Upstream: name must not be empty")
 	}
-	forwarder := forwarder.NewForwarder(name, balancer)
-	healthcheck := healthcheck.NewHealthChecker()
-	healthcheck.AddUpdater(name, forwarder)
 
-	up := &Upstream{forwarder: forwarder, healthcheck: healthcheck}
+	up := &Upstream{forwarder: forwarder.NewForwarder(name, balancer.DefaultBalancer)}
 	up.Update(options...)
 	return up
 }
@@ -74,11 +78,14 @@ func (up *Upstream) Name() string { return up.forwarder.Name() }
 // Policy returns the forwarding policy of the upstream.
 func (up *Upstream) Policy() string { return up.forwarder.GetBalancer().Policy() }
 
-// Checker returns the healthcheck configuration of the upstream.
-func (up *Upstream) Checker() healthcheck.Checker { return up.checkerconf.Load() }
+// ContextData returns the context data of the upstream.
+func (up *Upstream) ContextData() interface{} { return up.context.Load() }
 
-// Endpoints returns all the backend endpoints.
-func (up *Upstream) Endpoints() endpoint.Endpoints { return up.forwarder.AllEndpoints() }
+// Endpoints returns the endpoint discovery.
+func (up *Upstream) Discovery() endpoint.Discovery { return up.forwarder.GetEndpointDiscovery() }
+
+// Timeout returns the timeout.
+func (up *Upstream) Timeout() time.Duration { return up.forwarder.GetTimeout() }
 
 // Forwader returns the inner forwarder.
 func (up *Upstream) Forwader() forwarder.Forwarder { return *up.forwarder }
@@ -86,9 +93,10 @@ func (up *Upstream) Forwader() forwarder.Forwarder { return *up.forwarder }
 // Options returns the options of the upstream.
 func (up *Upstream) Options() []Option {
 	return []Option{
-		SetHealthCheck(up.Checker()),
-		SetEndpoints(up.Endpoints()...),
+		SetTimeout(up.Timeout()),
+		SetDiscovery(up.Discovery()),
 		SetBalancer(up.forwarder.GetBalancer()),
+		SetContextData(up.ContextData()),
 	}
 }
 
@@ -98,9 +106,3 @@ func (up *Upstream) Update(options ...Option) {
 		option(up)
 	}
 }
-
-// Stop stops the inner healthcheck of the upstream.
-func (up *Upstream) Stop() { up.healthcheck.Stop() }
-
-// Start starts the inner healthcheck of the upstream.
-func (up *Upstream) Start() { up.healthcheck.Start() }

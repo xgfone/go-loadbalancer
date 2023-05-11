@@ -14,15 +14,11 @@
 
 package upstream
 
-import (
-	"testing"
-
-	"github.com/xgfone/go-loadbalancer/balancer"
-)
+import "testing"
 
 func TestManager(t *testing.T) {
 	m := NewManager()
-	m.AddUpstream(NewUpstream("test", balancer.DefaultBalancer))
+	m.AddUpstream(NewUpstream("test"))
 
 	ups := m.GetUpstreams()
 	if _len := len(ups); _len != 1 {
