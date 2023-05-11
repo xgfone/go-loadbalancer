@@ -177,7 +177,7 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 
 	start := time.Now()
 	var statusCode int
-	resp, err := s.do(r.DstReq)
+	resp, err := s.do(ctx, r.DstReq)
 	if resp != nil {
 		statusCode = resp.StatusCode
 		defer resp.Body.Close()
@@ -252,16 +252,16 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 func (s *server) Check(ctx context.Context, req interface{}) (ok bool) {
 	switch r := req.(type) {
 	case interface{ GetHTTPRequest() *http.Request }:
-		return s.checkHTTP(r.GetHTTPRequest())
+		return s.checkHTTP(ctx, r.GetHTTPRequest())
 
 	case interface{ GetRequest() *http.Request }:
-		return s.checkHTTP(r.GetRequest())
+		return s.checkHTTP(ctx, r.GetRequest())
 
 	case *http.Request:
-		return s.checkHTTP(r)
+		return s.checkHTTP(ctx, r)
 
 	case Request:
-		return s.checkHTTP(r.DstReq)
+		return s.checkHTTP(ctx, r.DstReq)
 
 	case nil:
 		return s.checkTCP()
@@ -271,10 +271,10 @@ func (s *server) Check(ctx context.Context, req interface{}) (ok bool) {
 	}
 }
 
-func (s *server) checkHTTP(req *http.Request) (ok bool) {
+func (s *server) checkHTTP(ctx context.Context, req *http.Request) (ok bool) {
 	req.RequestURI = ""
 	req.URL.Host = s.id
-	resp, err := s.do(req)
+	resp, err := s.do(ctx, req)
 	ok = err == nil && resp.StatusCode < 500
 	if resp != nil {
 		resp.Body.Close()
@@ -291,7 +291,11 @@ func (s *server) checkTCP() (ok bool) {
 	return
 }
 
-func (s *server) do(req *http.Request) (*http.Response, error) {
+func (s *server) do(ctx context.Context, req *http.Request) (*http.Response, error) {
+	if _, ok := ctx.Deadline(); ok {
+		req = req.WithContext(ctx)
+	}
+
 	if client := s.getConf().Client; client != nil {
 		return client.Do(req)
 	}
