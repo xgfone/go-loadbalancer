@@ -23,17 +23,20 @@ import (
 type endpoint struct {
 	ip      string
 	state   loadbalancer.EndpointState
+	status  loadbalancer.EndpointStatus
 	weight  int
 	current uint64
 }
 
+func (ep *endpoint) String() string                          { return ep.ip }
 func (ep *endpoint) Weight() int                             { return ep.weight }
 func (ep *endpoint) ID() string                              { return ep.ip }
 func (ep *endpoint) Type() string                            { return "" }
 func (ep *endpoint) Info() interface{}                       { return nil }
-func (ep *endpoint) Check(context.Context, interface{}) bool { return true }
 func (ep *endpoint) Update(info interface{}) error           { return nil }
-func (ep *endpoint) Status() loadbalancer.EndpointStatus     { return loadbalancer.EndpointStatusOnline }
+func (ep *endpoint) SetStatus(s loadbalancer.EndpointStatus) { ep.status = s }
+func (ep *endpoint) Status() loadbalancer.EndpointStatus     { return ep.status }
+func (ep *endpoint) Check(context.Context, interface{}) bool { return true }
 func (ep *endpoint) State() loadbalancer.EndpointState {
 	state := ep.state.Clone()
 	if ep.current > 0 {
@@ -50,5 +53,7 @@ func (ep *endpoint) Serve(c context.Context, r interface{}) error {
 
 // NewEndpoint returns a new endpoint to do the test.
 func NewEndpoint(ip string, weight int) loadbalancer.Endpoint {
-	return &endpoint{ip: ip, weight: weight, current: uint64(weight)}
+	ep := &endpoint{ip: ip, weight: weight, current: uint64(weight)}
+	ep.SetStatus(loadbalancer.EndpointStatusOnline)
+	return ep
 }

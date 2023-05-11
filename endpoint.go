@@ -93,6 +93,7 @@ type Endpoint interface {
 	// Dynamic information
 	State() EndpointState
 	Status() EndpointStatus
+	SetStatus(EndpointStatus)
 
 	// Handler
 	Update(info interface{}) error
