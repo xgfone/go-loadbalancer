@@ -78,8 +78,16 @@ func (c Config) ID() string {
 
 // NewEndpoint returns a new endpoint.
 //
-// For the method Serve, req must be Request.
-// For the method Check, req must be one of *http.Request, Request, or nil.
+// For the method Serve, req must be one of
+//   - Request
+//   - interface{ GetRequest() Request }
+//
+// For the method Check, req must be one of
+//   - nil
+//   - Request
+//   - *http.Request
+//   - interface{ GetRequest() *http.Request }
+//   - interface{ GetHTTPRequest() *http.Request }
 func (c Config) NewEndpoint() endpoint.WeightedEndpoint {
 	if c.IP == "" {
 		panic("HttpEndpoint: ip must not be empty")
@@ -131,7 +139,16 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 	s.state.Inc()
 	defer s.state.Dec()
 
-	r := req.(Request)
+	var r Request
+	switch _req := req.(type) {
+	case Request:
+		r = _req
+	case interface{ GetRequest() Request }:
+		r = _req.GetRequest()
+	default:
+		panic(fmt.Errorf("HttpEndpoint.Serve: unsupported req type '%T'", req))
+	}
+
 	r.DstReq.RequestURI = ""
 	r.DstReq.URL.Host = s.id
 
@@ -162,38 +179,43 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 
 func (s *server) Check(ctx context.Context, req interface{}) (ok bool) {
 	switch r := req.(type) {
+	case interface{ GetHTTPRequest() *http.Request }:
+		return s.checkHTTP(r.GetHTTPRequest())
+
+	case interface{ GetRequest() *http.Request }:
+		return s.checkHTTP(r.GetRequest())
+
 	case *http.Request:
-		// HTTP
-		r.RequestURI = ""
-		r.URL.Host = s.id
-		resp, err := s.do(r)
-		ok = err == nil
-		if resp != nil {
-			resp.Body.Close()
-		}
+		return s.checkHTTP(r)
 
 	case Request:
-		// HTTP
-		r.DstReq.RequestURI = ""
-		r.DstReq.URL.Host = s.id
-		resp, err := s.do(r.DstReq)
-		ok = err == nil
-		if resp != nil {
-			resp.Body.Close()
-		}
+		return s.checkHTTP(r.DstReq)
 
 	case nil:
-		// TCP
-		conn, err := net.DialTimeout("tcp", s.id, time.Second)
-		ok = err == nil
-		if conn != nil {
-			conn.Close()
-		}
+		return s.checkTCP()
 
 	default:
-		panic(fmt.Errorf("HttpEndpoint.Check: unsupported req type '%s'", req))
+		panic(fmt.Errorf("HttpEndpoint.Check: unsupported req type '%T'", req))
 	}
+}
 
+func (s *server) checkHTTP(req *http.Request) (ok bool) {
+	req.RequestURI = ""
+	req.URL.Host = s.id
+	resp, err := s.do(req)
+	ok = err == nil
+	if resp != nil {
+		resp.Body.Close()
+	}
+	return
+}
+
+func (s *server) checkTCP() (ok bool) {
+	conn, err := net.DialTimeout("tcp", s.id, time.Second)
+	ok = err == nil
+	if conn != nil {
+		conn.Close()
+	}
 	return
 }
 
