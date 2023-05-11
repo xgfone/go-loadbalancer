@@ -23,6 +23,7 @@ import (
 	"github.com/xgfone/go-atomicvalue"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/healthcheck"
 )
 
@@ -38,7 +39,7 @@ type Forwarder struct {
 	balancer  atomicvalue.Value[balancer.Balancer]
 	discovery atomicvalue.Value[loadbalancer.EndpointDiscovery]
 
-	epmanager *loadbalancer.EndpointManager
+	epmanager *endpoint.Manager
 	httperror HTTPErrorHandler
 }
 
@@ -51,7 +52,7 @@ func NewForwarder(name string, balancer balancer.Balancer) *Forwarder {
 	return &Forwarder{
 		name:      name,
 		balancer:  atomicvalue.NewValue(balancer),
-		epmanager: loadbalancer.NewEndpointManager(),
+		epmanager: endpoint.NewManager(),
 		httperror: handleHTTPError,
 	}
 }
@@ -217,18 +218,9 @@ func (f *Forwarder) OffEndpoints() loadbalancer.Endpoints {
 }
 
 // AllEndpoints implements the inerface loadbalancer.EndpointDiscovery#OnEndpoints
-// to return all the endpoints, which are a set of the wrappers of the original
-// endpoints and can be unwrapped by loadbalancer.UnwrapEndpoint.
+// to return all the endpoints.
 //
 // This is the inner endpoint management of the loadbalancer forwarder.
 func (f *Forwarder) AllEndpoints() loadbalancer.Endpoints {
 	return f.epmanager.AllEndpoints()
-}
-
-// AllOriginEndpoints is the same as AllEndpoints,
-// but returns the original endpoints instead.
-//
-// This is the inner endpoint management of the loadbalancer forwarder.
-func (f *Forwarder) AllOriginEndpoints() loadbalancer.Endpoints {
-	return f.epmanager.AllOriginEndpoints()
 }

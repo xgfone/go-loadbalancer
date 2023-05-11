@@ -19,7 +19,7 @@ import (
 
 	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
-	"github.com/xgfone/go-loadbalancer/endpoints/httpep"
+	"github.com/xgfone/go-loadbalancer/http/endpoint"
 	"github.com/xgfone/go-loadbalancer/internal/nets"
 	"github.com/xgfone/go-loadbalancer/internal/slog"
 )
@@ -77,9 +77,9 @@ func handleHTTPError(f *Forwarder, w http.ResponseWriter, r *http.Request, err e
 }
 
 // ServeHTTP implements the interface http.Handler,
-// which will use httpep.SetReqRespIntoCtx to store w and r
+// which will use http/endpoint.SetReqRespIntoCtx to store w and r
 // into the context, then call the Serve method.
 func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := httpep.SetReqRespIntoCtx(r.Context(), w, r)
-	f.httperror(f, w, r, f.Serve(ctx, r))
+	ctx := endpoint.SetReqRespIntoCtx(r.Context(), w, r)
+	f.httperror(f, w, r, f.Serve(ctx, endpoint.NewRequest(w, nil, r)))
 }

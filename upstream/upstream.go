@@ -16,32 +16,12 @@
 package upstream
 
 import (
-	"context"
-	"net/http"
-
 	"github.com/xgfone/go-atomicvalue"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer"
 	"github.com/xgfone/go-loadbalancer/forwarder"
 	"github.com/xgfone/go-loadbalancer/healthcheck"
-	"github.com/xgfone/go-loadbalancer/processor"
 )
-
-// Request represents a upstream request context.
-type Request struct {
-	RespBodyHandler processor.ResponseProcessor
-	http.ResponseWriter
-	*http.Request
-}
-
-// RequestID returns the request id.
-func (r Request) RequestID() string { return r.Request.Header.Get("X-Request-Id") }
-
-// RemoteAddr returns the address of the client.
-func (r Request) RemoteAddr() string { return r.Request.RemoteAddr }
-
-// GetRequest returns the request.
-func (r Request) GetRequest() *http.Request { return r.Request }
 
 // Option is used to configure the upstream.
 type Option func(*Upstream)
@@ -56,6 +36,8 @@ func SetBalancer(balancer balancer.Balancer) Option {
 
 // SetHealthCheck returns an upstream option to set the healthcheck config
 // of all the backend endpoints.
+//
+// NOTICE: it should be set before SetEndpoints.
 func SetHealthCheck(checker healthcheck.Checker) Option {
 	return func(u *Upstream) { u.checkerconf.Store(checker) }
 }
@@ -96,7 +78,7 @@ func (up *Upstream) Policy() string { return up.forwarder.GetBalancer().Policy()
 func (up *Upstream) Checker() healthcheck.Checker { return up.checkerconf.Load() }
 
 // Endpoints returns all the backend endpoints.
-func (up *Upstream) Endpoints() loadbalancer.Endpoints { return up.forwarder.AllOriginEndpoints() }
+func (up *Upstream) Endpoints() loadbalancer.Endpoints { return up.forwarder.AllEndpoints() }
 
 // Forwader returns the inner forwarder.
 func (up *Upstream) Forwader() forwarder.Forwarder { return *up.forwarder }
@@ -104,9 +86,9 @@ func (up *Upstream) Forwader() forwarder.Forwarder { return *up.forwarder }
 // Options returns the options of the upstream.
 func (up *Upstream) Options() []Option {
 	return []Option{
-		SetBalancer(up.forwarder.GetBalancer()),
 		SetHealthCheck(up.Checker()),
 		SetEndpoints(up.Endpoints()...),
+		SetBalancer(up.forwarder.GetBalancer()),
 	}
 }
 
@@ -122,14 +104,3 @@ func (up *Upstream) Stop() { up.healthcheck.Stop() }
 
 // Start starts the inner healthcheck of the upstream.
 func (up *Upstream) Start() { up.healthcheck.Start() }
-
-// Forward forwards the request to one of the backend endpoints,
-// which uses Request as the request context.
-func (up *Upstream) Forward(c context.Context, w http.ResponseWriter, r *http.Request,
-	respBodyHandler processor.ResponseProcessor) error {
-	return up.forwarder.Serve(c, Request{
-		RespBodyHandler: respBodyHandler,
-		ResponseWriter:  w,
-		Request:         r,
-	})
-}

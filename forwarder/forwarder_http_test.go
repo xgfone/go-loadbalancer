@@ -25,7 +25,7 @@ import (
 
 	"github.com/xgfone/go-loadbalancer/balancer/retry"
 	"github.com/xgfone/go-loadbalancer/balancer/roundrobin"
-	"github.com/xgfone/go-loadbalancer/endpoints/httpep"
+	"github.com/xgfone/go-loadbalancer/http/endpoint"
 )
 
 func testHandler(key string) http.Handler {
@@ -51,26 +51,20 @@ func TestLoadBalancer(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 100)
 
-	ep1, err := httpep.Config{
-		URL: httpep.URL{Hostname: "www.example.com", IP: "127.0.0.1", Port: 8101},
-
-		StaticWeight: 1,
+	ep1 := endpoint.Config{
+		IP:     "127.0.0.1",
+		Port:   8101,
+		Weight: 1,
 	}.NewEndpoint()
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	ep2, err := httpep.Config{
-		URL: httpep.URL{Hostname: "www.example.com", IP: "127.0.0.1", Port: 8102},
-
-		StaticWeight: 2,
+	ep2 := endpoint.Config{
+		IP:     "127.0.0.1",
+		Port:   8102,
+		Weight: 2,
 	}.NewEndpoint()
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	if url := ep1.Info().(httpep.Config).URL.String(); url != "http://127.0.0.1:8101" {
-		t.Errorf("expect url '%s', but got '%s'", "http://127.0.0.1:8101", url)
+	if url := ep1.Info().(endpoint.Config).ID(); url != "127.0.0.1:8101" {
+		t.Errorf("expect '%s', but got '%s'", "127.0.0.1:8101", url)
 	}
 	if ok := ep1.Check(context.Background(), nil); !ok {
 		t.Errorf("the endpoint is offline")
