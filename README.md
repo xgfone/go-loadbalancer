@@ -13,16 +13,17 @@ $ go get -u github.com/xgfone/go-loadbalancer
 package main
 
 import (
+	"errors"
 	"flag"
 	"net/http"
 
 	"github.com/xgfone/go-binder"
-	"github.com/xgfone/go-checker"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer"
-	"github.com/xgfone/go-loadbalancer/endpoints/httpep"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/forwarder"
 	"github.com/xgfone/go-loadbalancer/healthcheck"
+	httpep "github.com/xgfone/go-loadbalancer/http/endpoint"
 )
 
 var listenAddr = flag.String("listen-addr", ":80", "The address that api gateway listens on.")
@@ -44,14 +45,15 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Path     string `json:"path" validate:"required"`
-		Method   string `json:"method" validate:"required"`
-		Upstream struct {
-			ForwardPolicy string         `json:"forwardPolicy" default:"weight_random"`
-			ForwardURL    httpep.URL     `json:"forwardUrl"`
-			HealthCheck   checker.Config `json:"healthCheck"`
+		// Route Matcher
+		Path   string `json:"path" validate:"required"`
+		Method string `json:"method" validate:"required"`
 
-			Servers []struct {
+		// Upstream Endpoints
+		Upstream struct {
+			ForwardPolicy string              `json:"forwardPolicy" default:"weight_random"`
+			HealthCheck   healthcheck.Checker `json:"healthCheck"`
+			Servers       []struct {
 				IP     string `json:"ip" validate:"ip"`
 				Port   uint16 `json:"port" validate:"ranger(1,65535)"`
 				Weight int    `json:"weight" default:"1" validate:"min(1)"`
@@ -59,7 +61,7 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 		} `json:"upstream"`
 	}
 
-	if err := binder.BodyDecoder.Decode(&req, r.Body); err != nil {
+	if err := binder.BodyDecoder.Decode(&req, r); err != nil {
 		http.Error(w, "invalid request route paramenter: "+err.Error(), 400)
 		return
 	}
@@ -67,23 +69,16 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 	// Build the upstream backend servers.
 	endpoints := make(endpoint.Endpoints, len(req.Upstream.Servers))
 	for i, server := range req.Upstream.Servers {
-		config := httpep.Config{URL: req.Upstream.ForwardURL}
-		config.StaticWeight = server.Weight
-		config.URL.Port = server.Port
-		config.URL.IP = server.IP
-
-		endpoint, err := config.NewEndpoint()
-		if err != nil {
-			http.Error(w, "fail to build the upstream server: "+err.Error(), 400)
-			return
-		}
-
-		endpoints[i] = endpoint
+		endpoints[i] = httpep.Config{
+			IP:     server.IP,
+			Port:   server.Port,
+			Weight: server.Weight,
+		}.NewEndpoint()
 	}
 
 	// Build the loadbalancer forwarder.
 	balancer, _ := balancer.Build(req.Upstream.ForwardPolicy, nil)
-	forwarder := forwarder.NewForwarder(req.Method+""+req.Path, balancer)
+	forwarder := forwarder.NewForwarder(req.Method+"@"+req.Path, balancer)
 
 	healthcheck.DefaultHealthChecker.AddUpdater(forwarder.Name(), forwarder)
 	healthcheck.DefaultHealthChecker.UpsertEndpoints(endpoints, req.Upstream.HealthCheck)
@@ -92,10 +87,45 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 	http.HandleFunc(req.Path, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != req.Method {
 			w.WriteHeader(http.StatusMethodNotAllowed)
-		} else {
-			forwarder.ServeHTTP(w, r)
+			return
+		}
+
+		// 1. Create a new request.
+		ctx := r.Context()
+		req := r.Clone(ctx)
+		req.URL.Scheme = "http"
+		req.RequestURI = "" // Pretend to be a client request.
+		//req.URL.Host = "" // Dial to the backend http endpoint.
+
+		// 2. Process the request.
+		// TODO ...
+
+		// 3. Forward the request and handle the response.
+		err := forwarder.Serve(ctx, httpep.NewRequest(w, r, req))
+		switch {
+		case err == nil: // Success
+
+		case err == loadbalancer.ErrNoAvailableEndpoints:
+			w.WriteHeader(503) // Service Unavailable
+
+		case IsTimeout(err):
+			w.WriteHeader(504) // Gateway Timeout
+
+		default:
+			w.WriteHeader(502) // Bad Gateway
 		}
 	})
+}
+
+type timeoutError interface {
+	Timeout() bool
+	error
+}
+
+// IsTimeout reports whether the error is timeout.
+func IsTimeout(err error) bool {
+	var timeoutErr timeoutError
+	return errors.As(err, &timeoutErr) && timeoutErr.Timeout()
 }
 ```
 
@@ -107,10 +137,10 @@ $ nohup go run main.go &
 # Notice: remove the characters from // to the line end.
 $ curl -XPOST http://127.0.0.1/admin/route -H 'Content-Type: application/json' -d '
 {
-    "rule": "Method(`GET`) && Path(`/path`)",
+    "path": "/path",
+    "method": "GET",
     "upstream": {
         "forwardPolicy": "weight_round_robin",
-        "forwardUrl" : {"path": "/backend/path"},
         "servers": [
             {"ip": "192.168.1.11", "port": 80, "weight": 10}, // 33.3% requests
             {"ip": "192.168.1.12", "port": 80, "weight": 20}  // 66.7% requests
