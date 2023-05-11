@@ -61,7 +61,10 @@ func (b Retry) Forward(c context.Context, r interface{}, sd endpoint.Discovery) 
 	for ; _len > 0; _len-- {
 		select {
 		case <-c.Done():
-			return c.Err()
+			if err == nil {
+				err = c.Err()
+			}
+			return
 		default:
 		}
 
@@ -85,7 +88,7 @@ func (b Retry) Forward(c context.Context, r interface{}, sd endpoint.Discovery) 
 				case <-timer.C:
 				default:
 				}
-				return c.Err()
+				return
 			}
 		}
 	}
