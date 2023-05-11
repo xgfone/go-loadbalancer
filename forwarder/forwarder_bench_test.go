@@ -27,7 +27,7 @@ import (
 func BenchmarkLoadBalancer(b *testing.B) {
 	slog.SetDiscardWriter() // Discard log for test.
 	lb := NewForwarder("test", random.NewBalancer(""))
-	lb.ResetEndpoints(tests.NewEndpoint("127.0.0.1", 1), tests.NewEndpoint("127.0.0.2", 1))
+	lb.EndpointManager().ResetEndpoints(tests.NewEndpoint("127.0.0.1", 1), tests.NewEndpoint("127.0.0.2", 1))
 
 	rec := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)

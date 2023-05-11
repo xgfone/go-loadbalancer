@@ -70,7 +70,7 @@ func TestLoadBalancer(t *testing.T) {
 		t.Errorf("the endpoint is offline")
 	}
 
-	forwarder.ResetEndpoints(ep1, ep2)
+	forwarder.EndpointManager().ResetEndpoints(ep1, ep2)
 
 	rec := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
@@ -108,10 +108,10 @@ func TestLoadBalancer(t *testing.T) {
 	/// ------------------------------------------------------------------ ///
 
 	forwarder.SetEndpointOnline(ep1.ID(), false)
-	if ep, ok := forwarder.GetEndpoint(ep1.ID()); !ok || ep.Status().IsOnline() {
+	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep1.ID()); !ok || ep.Status().IsOnline() {
 		t.Errorf("invalid the endpoint1 online status: online=%v, ok=%v", ep.Status().IsOnline(), ok)
 	}
-	if ep, ok := forwarder.GetEndpoint(ep2.ID()); !ok || !ep.Status().IsOnline() {
+	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep2.ID()); !ok || !ep.Status().IsOnline() {
 		t.Errorf("invalid the endpoint2 online status: online=%v, ok=%v", ep.Status().IsOnline(), ok)
 	}
 
@@ -137,7 +137,7 @@ func TestLoadBalancer(t *testing.T) {
 	/// ------------------------------------------------------------------ ///
 
 	forwarder.SetEndpointOnline(ep2.ID(), false)
-	if ep, ok := forwarder.GetEndpoint(ep2.ID()); !ok || ep.Status().IsOnline() {
+	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep2.ID()); !ok || ep.Status().IsOnline() {
 		t.Errorf("invalid the endpoint2 online status: online=%v, ok=%v", ep.Status().IsOnline(), ok)
 	}
 
