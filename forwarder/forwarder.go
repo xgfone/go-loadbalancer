@@ -101,6 +101,14 @@ func (f *Forwarder) SwapEndpointDiscovery(new endpoint.Discovery) (old endpoint.
 	return
 }
 
+// Discovery returns the customized Discovery or the inner manager.
+func (f *Forwarder) Discovery() endpoint.Discovery {
+	if ed := f.GetEndpointDiscovery(); ed != nil {
+		return ed
+	}
+	return f.epmanager
+}
+
 // EndpointManager returns the inner endpoint manager of the forwarder.
 func (f *Forwarder) EndpointManager() *endpoint.Manager { return f.epmanager }
 
@@ -165,33 +173,26 @@ func (f *Forwarder) RemoveEndpoint(epid string) {
 
 // ------------------------------------------------------------------------ //
 
-func (f *Forwarder) getDiscovery() endpoint.Discovery {
-	if ed := f.GetEndpointDiscovery(); ed != nil {
-		return ed
-	}
-	return f.epmanager
-}
-
 // OnlineNum implements the interfce endpoint.Discovery#OnlineNum
 // to return the number of the online endpoints.
 func (f *Forwarder) OnlineNum() int {
-	return f.getDiscovery().OnlineNum()
+	return f.Discovery().OnlineNum()
 }
 
 // OnEndpoints implements the inerface endpoint.Discovery#OnEndpoints
 // to only return all the online endpoints.
 func (f *Forwarder) OnEndpoints() endpoint.Endpoints {
-	return f.getDiscovery().OnEndpoints()
+	return f.Discovery().OnEndpoints()
 }
 
 // OffEndpoints implements the inerface endpoint.Discovery#OffEndpoints
 // to only return all the offline endpoints.
 func (f *Forwarder) OffEndpoints() endpoint.Endpoints {
-	return f.getDiscovery().OffEndpoints()
+	return f.Discovery().OffEndpoints()
 }
 
 // AllEndpoints implements the inerface endpoint.Discovery#OnEndpoints
 // to return all the endpoints.
 func (f *Forwarder) AllEndpoints() endpoint.Endpoints {
-	return f.getDiscovery().AllEndpoints()
+	return f.Discovery().AllEndpoints()
 }
