@@ -173,15 +173,20 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 	if err == nil {
 		s.state.IncSuccess()
 		if slog.Enabled(ctx, slog.LevelDebug) {
-			slog.Debug("forward the http request to the backend http endpoint",
-				"epid", s.id,
-				"reqid", defaults.GetRequestID(ctx, r),
-				"srcreq", map[string]string{
+			var srcreq map[string]string
+			if r.SrcReq != nil {
+				srcreq = map[string]string{
 					"raddr":  r.SrcReq.RemoteAddr,
 					"method": r.SrcReq.Method,
 					"host":   r.SrcReq.Host,
 					"uri":    r.SrcReq.RequestURI,
-				},
+				}
+			}
+
+			slog.Debug("forward the http request to the backend http endpoint",
+				"epid", s.id,
+				"reqid", defaults.GetRequestID(ctx, r),
+				"srcreq", srcreq,
 				"dstreq", map[string]interface{}{
 					"method": r.DstReq.Method,
 					"host":   r.DstReq.Host,
@@ -193,15 +198,20 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 			)
 		}
 	} else {
-		slog.Error("forward the http request to the backend http endpoint",
-			"epid", s.id,
-			"reqid", defaults.GetRequestID(ctx, req),
-			"srcreq", map[string]string{
+		var srcreq map[string]string
+		if r.SrcReq != nil {
+			srcreq = map[string]string{
 				"raddr":  r.SrcReq.RemoteAddr,
 				"method": r.SrcReq.Method,
 				"host":   r.SrcReq.Host,
 				"uri":    r.SrcReq.RequestURI,
-			},
+			}
+		}
+
+		slog.Error("forward the http request to the backend http endpoint",
+			"epid", s.id,
+			"reqid", defaults.GetRequestID(ctx, req),
+			"srcreq", srcreq,
 			"dstreq", map[string]interface{}{
 				"method": r.DstReq.Method,
 				"host":   r.DstReq.Host,
