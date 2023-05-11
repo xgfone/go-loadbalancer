@@ -35,6 +35,6 @@ func BenchmarkLoadBalancer(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		lb.ServeHTTP(rec, req)
+		lb.serveHTTP(rec, req)
 	}
 }
