@@ -33,19 +33,24 @@ var DefaultHealthChecker = NewHealthChecker()
 type epchecker struct {
 	endpoint.Endpoint
 	*checker.Checker
+
 	config atomicvalue.Value[Checker]
+	hcheck *HealthChecker
 }
 
 func newEndpointChecker(hc *HealthChecker, ep endpoint.Endpoint, config Checker) *epchecker {
-	epc := &epchecker{Endpoint: ep}
+	epc := &epchecker{Endpoint: ep, hcheck: hc}
 	epc.Checker = checker.NewChecker(ep.ID(), epc, hc.setOnline)
 	epc.SetChecker(config)
 	return epc
 }
 
-func (c *epchecker) GetChecker() Checker            { return c.config.Load() }
-func (c *epchecker) SetChecker(config Checker)      { c.config.Store(config); c.SetConfig(config.Config) }
-func (c *epchecker) Check(ctx context.Context) bool { return c.Endpoint.Check(ctx, c.GetChecker().Req) }
+func (c *epchecker) Check(ctx context.Context) bool {
+	return c.hcheck.checkEndpoint(ctx, c.Endpoint, c.GetChecker().Req)
+}
+
+func (c *epchecker) GetChecker() Checker       { return c.config.Load() }
+func (c *epchecker) SetChecker(config Checker) { c.config.Store(config); c.SetConfig(config.Config) }
 
 func (c *epchecker) Unwrap() endpoint.Endpoint        { return c.Endpoint }
 func (c *epchecker) GetEndpoint() endpoint.Endpoint   { return c.Endpoint }
@@ -75,6 +80,8 @@ type HealthChecker struct {
 	cancel   context.CancelFunc
 	context  context.Context
 	updaters sync.Map
+
+	epcheck atomicvalue.Value[func(context.Context, endpoint.Endpoint, interface{}) bool]
 }
 
 // NewHealthChecker returns a new health checker.
@@ -87,6 +94,20 @@ func (hc *HealthChecker) setOnline(epid string, online bool) {
 		value.(Updater).SetEndpointOnline(epid, online)
 		return true
 	})
+}
+
+func (hc *HealthChecker) checkEndpoint(ctx context.Context, ep endpoint.Endpoint, req interface{}) bool {
+	if check := hc.epcheck.Load(); check != nil {
+		return check(ctx, ep, req)
+	}
+	return ep.Check(ctx, req)
+}
+
+// SetEndpointCheck set the check function to intercept the healthcheck of the endpoint.
+//
+// f may be nil, which is equal to call the Check method of Endpoint directly.
+func (hc *HealthChecker) SetEndpointCheck(f func(context.Context, endpoint.Endpoint, interface{}) bool) {
+	hc.epcheck.Store(f)
 }
 
 // Stop stops the health checker.
