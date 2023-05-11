@@ -29,7 +29,7 @@ func TestCompactRequestProcessors(t *testing.T) {
 }
 
 func TestCompactResponseProcessors(t *testing.T) {
-	nothing := func(_ context.Context, _ http.ResponseWriter, _ *http.Request, res *http.Response, err error) error {
+	nothing := func(_ context.Context, _ http.ResponseWriter, _, _ *http.Request, res *http.Response, err error) error {
 		return err
 	}
 

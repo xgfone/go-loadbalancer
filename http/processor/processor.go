@@ -29,7 +29,7 @@ type RequestProcessor interface {
 // ResponseProcessor is used to process the response
 // after receiving the response from the backend endpoint.
 type ResponseProcessor interface {
-	ProcessResponse(context.Context, http.ResponseWriter, *http.Request, *http.Response, error) error
+	ProcessResponse(ctx context.Context, srcrw http.ResponseWriter, srcreq, dstreq *http.Request, dstres *http.Response, err error) error
 }
 
 type (
@@ -37,7 +37,7 @@ type (
 	RequestProcessorFunc func(context.Context, *http.Request)
 
 	// ResponseProcessorFunc is the response processor function.
-	ResponseProcessorFunc func(context.Context, http.ResponseWriter, *http.Request, *http.Response, error) error
+	ResponseProcessorFunc func(ctx context.Context, srcrw http.ResponseWriter, srcreq, dstreq *http.Request, dstres *http.Response, err error) error
 )
 
 var (
@@ -57,9 +57,9 @@ func (f RequestProcessorFunc) ProcessRequest(c context.Context, r *http.Request)
 // ProcessResponse implements the interface ResponseProcessor.
 //
 // f may be nil, which is equal to do nothing and return the original error.
-func (f ResponseProcessorFunc) ProcessResponse(c context.Context, w http.ResponseWriter, req *http.Request, res *http.Response, err error) error {
+func (f ResponseProcessorFunc) ProcessResponse(ctx context.Context, srcrw http.ResponseWriter, srcreq, dstreq *http.Request, dstres *http.Response, err error) error {
 	if f != nil {
-		err = f(c, w, req, res, err)
+		err = f(ctx, srcrw, srcreq, dstreq, dstres, err)
 	}
 	return err
 }
@@ -77,7 +77,7 @@ func SimpleRequestProcessor(f func(*http.Request)) RequestProcessor {
 
 // SimpleResponseProcessor converts a simple function to ResponseProcessor.
 func SimpleResponseProcessor(f func(http.ResponseWriter, *http.Response, error) error) ResponseProcessor {
-	return ResponseProcessorFunc(func(_ context.Context, w http.ResponseWriter, _ *http.Request, r *http.Response, e error) error {
+	return ResponseProcessorFunc(func(_ context.Context, w http.ResponseWriter, _, _ *http.Request, r *http.Response, e error) error {
 		return f(w, r, e)
 	})
 }
@@ -103,9 +103,9 @@ func (ps RequestProcessors) ProcessRequest(c context.Context, r *http.Request) {
 }
 
 // ProcessResponse implements the interface ResponseProcessor.
-func (ps ResponseProcessors) ProcessResponse(c context.Context, w http.ResponseWriter, req *http.Request, res *http.Response, err error) error {
+func (ps ResponseProcessors) ProcessResponse(ctx context.Context, srcrw http.ResponseWriter, srcreq, dstreq *http.Request, dstres *http.Response, err error) error {
 	for i, _len := 0, len(ps); i < _len; i++ {
-		err = ps[i].ProcessResponse(c, w, req, res, err)
+		err = ps[i].ProcessResponse(ctx, srcrw, srcreq, dstreq, dstres, err)
 	}
 	return err
 }
