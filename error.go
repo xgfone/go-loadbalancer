@@ -27,6 +27,14 @@ func NewRetryError(retry bool, err error) RetryError {
 	return retryError{retry: retry, err: err}
 }
 
+// NewError is the same as NewRetryError, but returns nil instead if err is nil.
+func NewError(retry bool, err error) error {
+	if err != nil {
+		err = NewRetryError(retry, err)
+	}
+	return err
+}
+
 type retryError struct {
 	retry bool
 	err   error
