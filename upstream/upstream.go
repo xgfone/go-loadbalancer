@@ -32,6 +32,18 @@ func SetContextData(contextData interface{}) Option {
 	return func(u *Upstream) { u.context.Store(contextData) }
 }
 
+// SetLazyOption returns an upstream option to decide the final option
+// when the upstream is updated.
+//
+// If f returns nil, ignore and do nothing.
+func SetLazyOption(f func(*Upstream) Option) Option {
+	return func(u *Upstream) {
+		if o := f(u); o != nil {
+			u.Update(o)
+		}
+	}
+}
+
 // SetBalancer returns an upstream option to set the balancer.
 func SetBalancer(balancer balancer.Balancer) Option {
 	if balancer == nil {
