@@ -82,3 +82,12 @@ func Build(policy string, config interface{}) (balancer Balancer, err error) {
 	}
 	return
 }
+
+// Must is equal to Build, but panics if there is an error.
+func Must(policy string, config interface{}) (balancer Balancer) {
+	balancer, err := Build(policy, config)
+	if err != nil {
+		panic(err)
+	}
+	return
+}
