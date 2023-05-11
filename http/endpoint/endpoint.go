@@ -25,7 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/http/processor"
@@ -39,6 +38,9 @@ type Request struct {
 	SrcRes http.ResponseWriter
 	SrcReq *http.Request
 	DstReq *http.Request
+
+	RAddr string
+	RID   string
 }
 
 // NewRequest returns a new Request.
@@ -52,13 +54,33 @@ func (r Request) WithRespBodyProcessor(processor processor.ResponseProcessor) Re
 }
 
 // RequestID returns the request id.
-func (r Request) RequestID() string { return r.SrcReq.Header.Get("X-Request-Id") }
+func (r Request) RequestID() string {
+	switch {
+	case len(r.RID) != 0:
+		return r.RID
+	case r.SrcReq != nil:
+		return r.SrcReq.Header.Get("X-Request-Id")
+	default:
+		return ""
+	}
+}
 
 // RemoteAddr returns the address of the client.
-func (r Request) RemoteAddr() string { return r.SrcReq.RemoteAddr }
+func (r Request) RemoteAddr() string {
+	switch {
+	case len(r.RAddr) != 0:
+		return r.RAddr
+	case r.SrcReq != nil:
+		return r.SrcReq.RemoteAddr
+	default:
+		return ""
+	}
+}
 
 // GetRequest returns the request.
-func (r Request) GetRequest() *http.Request { return r.SrcReq }
+func (r Request) GetRequest() *http.Request {
+	return r.SrcReq
+}
 
 // ------------------------------------------------------------------------- //
 
@@ -185,7 +207,7 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 
 			slog.Debug("forward the http request to the backend http endpoint",
 				"epid", s.id,
-				"reqid", defaults.GetRequestID(ctx, r),
+				"reqid", r.RequestID(),
 				"srcreq", srcreq,
 				"dstreq", map[string]interface{}{
 					"method": r.DstReq.Method,
@@ -210,7 +232,7 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 
 		slog.Error("forward the http request to the backend http endpoint",
 			"epid", s.id,
-			"reqid", defaults.GetRequestID(ctx, req),
+			"reqid", r.RequestID(),
 			"srcreq", srcreq,
 			"dstreq", map[string]interface{}{
 				"method": r.DstReq.Method,
