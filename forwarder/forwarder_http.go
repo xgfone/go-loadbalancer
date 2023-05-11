@@ -15,6 +15,7 @@
 package forwarder
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/xgfone/go-defaults"
@@ -24,22 +25,18 @@ import (
 	"github.com/xgfone/go-loadbalancer/internal/slog"
 )
 
-// HTTPErrorHandler is used to handle the http error.
-type HTTPErrorHandler func(*Forwarder, http.ResponseWriter, *http.Request, error)
-
-// SetHTTPErrorHandler sets the error handler to handle the error of forwarding
-// the http request, so it may be used to log the request.
+// ServeHTTP implements the interface http.Handler,
+// which will use http/endpoint.SetReqRespIntoCtx to store w and r
+// into the context, then call the Serve method.
 //
-// If handler is equal to nil, reset it to the default.
-func (f *Forwarder) SetHTTPErrorHandler(handler HTTPErrorHandler) {
-	if handler == nil {
-		f.httperror = handleHTTPError
-	} else {
-		f.httperror = handler
-	}
+// NOTICE: YOU SHOULD IMPLEMENT YOURSELF ServeHTTP.
+func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := endpoint.SetReqRespIntoCtx(r.Context(), w, r)
+	f.handleHTTPError(ctx, w, r, f.Serve(ctx, endpoint.NewRequest(w, nil, r)))
 }
 
-func handleHTTPError(f *Forwarder, w http.ResponseWriter, r *http.Request, err error) {
+func (f *Forwarder) handleHTTPError(ctx context.Context,
+	w http.ResponseWriter, r *http.Request, err error) {
 	switch err {
 	case nil:
 		if slog.Enabled(r.Context(), slog.LevelDebug) {
@@ -74,12 +71,4 @@ func handleHTTPError(f *Forwarder, w http.ResponseWriter, r *http.Request, err e
 		"host", r.Host,
 		"uri", r.RequestURI,
 		"err", err)
-}
-
-// ServeHTTP implements the interface http.Handler,
-// which will use http/endpoint.SetReqRespIntoCtx to store w and r
-// into the context, then call the Serve method.
-func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := endpoint.SetReqRespIntoCtx(r.Context(), w, r)
-	f.httperror(f, w, r, f.Serve(ctx, endpoint.NewRequest(w, nil, r)))
 }

@@ -38,9 +38,7 @@ type Forwarder struct {
 	timeout   int64
 	balancer  atomicvalue.Value[balancer.Balancer]
 	discovery atomicvalue.Value[endpoint.Discovery]
-
 	epmanager *endpoint.Manager
-	httperror HTTPErrorHandler
 }
 
 // NewForwarder returns a new Forwarder to forward the request.
@@ -53,7 +51,6 @@ func NewForwarder(name string, balancer balancer.Balancer) *Forwarder {
 		name:      name,
 		balancer:  atomicvalue.NewValue(balancer),
 		epmanager: endpoint.NewManager(),
-		httperror: handleHTTPError,
 	}
 }
 
