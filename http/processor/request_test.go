@@ -12,26 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package upstream
+package processor
 
 import (
 	"context"
-	"net/http"
-
-	"github.com/xgfone/go-loadbalancer/http/endpoint"
-	"github.com/xgfone/go-loadbalancer/http/processor"
+	"testing"
 )
 
-// ForwardHTTP forwards the http request to one of the backend endpoints,
-// which uses http/endpoint.Request as the request context.
-func (up *Upstream) ForwardHTTP(ctx context.Context,
-	srcrw http.ResponseWriter, srcreq *http.Request,
-	dstreq *http.Request, respBodyHandler processor.ResponseProcessor) error {
-	return up.forwarder.Serve(ctx, endpoint.Request{
-		RespBodyProcessor: respBodyHandler,
-
-		SrcRes: srcrw,
-		SrcReq: srcreq,
-		DstReq: dstreq,
-	})
+func TestCompactRequestProcessors(t *testing.T) {
+	nothing := func(context.Context, Request) {}
+	processors := CompactRequestProcessors(nil, NoneRequestProcessor(), RequestProcessorFunc(nothing))
+	if _len := len(processors); _len != 1 {
+		t.Errorf("expect %d request processor, but got %d", 1, _len)
+	}
 }

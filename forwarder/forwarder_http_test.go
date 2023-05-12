@@ -23,38 +23,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer/retry"
 	"github.com/xgfone/go-loadbalancer/balancer/roundrobin"
 	"github.com/xgfone/go-loadbalancer/http/endpoint"
-	"github.com/xgfone/go-loadbalancer/internal/nets"
 )
 
 func testHandler(key string) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintln(rw, key)
 	})
-}
-
-func (f *Forwarder) serveHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	req := r.Clone(ctx)
-	req.URL.Scheme = "http"
-	req.RequestURI = "" // Pretend to be a client request.
-	//req.URL.Host = "" // Dial to the backend http endpoint.
-
-	err := f.Serve(ctx, endpoint.NewRequest(w, r, req))
-	switch {
-	case err == nil:
-	case err == loadbalancer.ErrNoAvailableEndpoints:
-		w.WriteHeader(503) // Service Unavailable
-
-	case nets.IsTimeout(err):
-		w.WriteHeader(504) // Gateway Timeout
-
-	default:
-		w.WriteHeader(502) // Bad Gateway
-	}
 }
 
 func TestLoadBalancer(t *testing.T) {
@@ -97,10 +74,10 @@ func TestLoadBalancer(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
-	forwarder.serveHTTP(rec, req)
-	forwarder.serveHTTP(rec, req)
-	forwarder.serveHTTP(rec, req)
-	forwarder.serveHTTP(rec, req)
+	forwarder.ServeHTTP(rec, req)
+	forwarder.ServeHTTP(rec, req)
+	forwarder.ServeHTTP(rec, req)
+	forwarder.ServeHTTP(rec, req)
 
 	expects := []string{
 		"8101",
@@ -111,7 +88,7 @@ func TestLoadBalancer(t *testing.T) {
 	}
 	results := strings.Split(rec.Body.String(), "\n")
 	if len(expects) != len(results) {
-		t.Errorf("expect %d lines, but got %d", len(expects), len(results))
+		t.Errorf("expect %d lines, but got %d: %v", len(expects), len(results), results)
 	} else {
 		for i, line := range results {
 			if line != expects[i] {
@@ -139,8 +116,8 @@ func TestLoadBalancer(t *testing.T) {
 	}
 
 	rec.Body.Reset()
-	forwarder.serveHTTP(rec, req)
-	forwarder.serveHTTP(rec, req)
+	forwarder.ServeHTTP(rec, req)
+	forwarder.ServeHTTP(rec, req)
 	expects = []string{
 		"8102",
 		"8102",
@@ -148,7 +125,7 @@ func TestLoadBalancer(t *testing.T) {
 	}
 	results = strings.Split(rec.Body.String(), "\n")
 	if len(expects) != len(results) {
-		t.Errorf("expect %d lines, but got %d", len(expects), len(results))
+		t.Errorf("expect %d lines, but got %d: %v", len(expects), len(results), results)
 	} else {
 		for i, line := range results {
 			if line != expects[i] {
@@ -182,7 +159,7 @@ func TestLoadBalancer(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	forwarder.serveHTTP(rec, req)
+	forwarder.ServeHTTP(rec, req)
 	if rec.Code != 503 {
 		t.Errorf("unexpected response: statuscode=%d, body=%s", rec.Code, rec.Body.String())
 	}

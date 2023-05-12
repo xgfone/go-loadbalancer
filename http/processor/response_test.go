@@ -16,20 +16,11 @@ package processor
 
 import (
 	"context"
-	"net/http"
 	"testing"
 )
 
-func TestCompactRequestProcessors(t *testing.T) {
-	nothing := func(c context.Context, r *http.Request) {}
-	processors := CompactRequestProcessors(nil, NoneRequestProcessor(), RequestProcessorFunc(nothing))
-	if _len := len(processors); _len != 1 {
-		t.Errorf("expect %d request processor, but got %d", 1, _len)
-	}
-}
-
 func TestCompactResponseProcessors(t *testing.T) {
-	nothing := func(_ context.Context, _ http.ResponseWriter, _, _ *http.Request, res *http.Response, err error) error {
+	nothing := func(_ context.Context, _ Response, err error) error {
 		return err
 	}
 

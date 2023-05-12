@@ -26,8 +26,8 @@ import (
 
 func BenchmarkLoadBalancer(b *testing.B) {
 	slog.SetDiscardWriter() // Discard log for test.
-	lb := NewForwarder("test", random.NewBalancer(""))
-	lb.EndpointManager().ResetEndpoints(tests.NewEndpoint("127.0.0.1", 1), tests.NewEndpoint("127.0.0.2", 1))
+	f := NewForwarder("test", random.NewBalancer(""))
+	f.EndpointManager().ResetEndpoints(tests.NewEndpoint("127.0.0.1", 1), tests.NewEndpoint("127.0.0.2", 1))
 
 	rec := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
@@ -35,6 +35,6 @@ func BenchmarkLoadBalancer(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		lb.serveHTTP(rec, req)
+		f.ServeHTTP(rec, req)
 	}
 }

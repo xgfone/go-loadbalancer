@@ -50,6 +50,9 @@ func Debug(msg string, args ...any) { emit(1, LevelDebug, msg, args...) }
 // Error emits an log with the Error level.
 func Error(msg string, args ...any) { emit(1, slog.LevelError, msg, args...) }
 
+// Log emits an log with the given level l.
+func Log(l slog.Level, msg string, args ...any) { emit(1, l, msg, args...) }
+
 func emit(skipStackDepth int, level slog.Level, msg string, kvs ...interface{}) {
 	if !Enabled(context.Background(), level) {
 		return

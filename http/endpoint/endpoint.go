@@ -48,9 +48,27 @@ func NewRequest(srcres http.ResponseWriter, srcreq, dstreq *http.Request) Reques
 	return Request{SrcRes: srcres, SrcReq: srcreq, DstReq: dstreq}
 }
 
+// WithRespBodyProcessor returns a new Request with the response body processor.
 func (r Request) WithRespBodyProcessor(processor processor.ResponseProcessor) Request {
 	r.RespBodyProcessor = processor
 	return r
+}
+
+// WithRemoteAddr returns a new Request with the remote address.
+func (r Request) WithRemoteAddr(raddr string) Request {
+	r.RAddr = raddr
+	return r
+}
+
+// WithRequestID returns a new Request with the request id.
+func (r Request) WithRequestID(rid string) Request {
+	r.RID = rid
+	return r
+}
+
+// Processor converts itself to the response processor.
+func (r Request) Processor(dstres *http.Response) processor.Response {
+	return processor.NewResponse(r.SrcRes, r.SrcReq, r.DstReq, dstres)
 }
 
 // RequestID returns the request id.
@@ -86,12 +104,15 @@ func (r Request) GetRequest() *http.Request {
 
 // Config is used to configure and new a http endpoint.
 type Config struct {
+	// Required
 	IP   string
 	Port uint16
 
+	// Default: 1
 	Weight    int
 	GetWeight func(endpoint.Endpoint) int
 
+	// If nil, use http.DefaultClient instead.
 	Client *http.Client
 }
 
@@ -185,9 +206,9 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 
 	if err == nil {
 		if r.RespBodyProcessor != nil {
-			err = r.RespBodyProcessor.ProcessResponse(ctx, r.SrcRes, r.SrcReq, r.DstReq, resp, nil)
+			err = r.RespBodyProcessor.Process(ctx, r.Processor(resp), nil)
 		} else {
-			err = s.handleResponse(r.SrcRes, resp)
+			err = HandleResponseBody(r.SrcRes, resp)
 		}
 	}
 
@@ -201,6 +222,7 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 					"raddr":  r.SrcReq.RemoteAddr,
 					"method": r.SrcReq.Method,
 					"host":   r.SrcReq.Host,
+					"path":   r.SrcReq.URL.Path,
 					"uri":    r.SrcReq.RequestURI,
 				}
 			}
@@ -212,7 +234,8 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 				"dstreq", map[string]interface{}{
 					"method": r.DstReq.Method,
 					"host":   r.DstReq.Host,
-					"uri":    r.DstReq.URL.Path,
+					"addr":   r.DstReq.URL.Host,
+					"path":   r.DstReq.URL.Path,
 					"code":   statusCode,
 				},
 				"start", start.Unix(),
@@ -226,6 +249,7 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 				"raddr":  r.SrcReq.RemoteAddr,
 				"method": r.SrcReq.Method,
 				"host":   r.SrcReq.Host,
+				"path":   r.SrcReq.URL.Path,
 				"uri":    r.SrcReq.RequestURI,
 			}
 		}
@@ -237,7 +261,8 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 			"dstreq", map[string]interface{}{
 				"method": r.DstReq.Method,
 				"host":   r.DstReq.Host,
-				"uri":    r.DstReq.URL.Path,
+				"addr":   r.DstReq.URL.Host,
+				"path":   r.DstReq.URL.Path,
 				"code":   statusCode,
 			},
 			"start", start.Unix(),
@@ -302,7 +327,8 @@ func (s *server) do(ctx context.Context, req *http.Request) (*http.Response, err
 	return http.DefaultClient.Do(req)
 }
 
-func (s *server) handleResponse(w http.ResponseWriter, resp *http.Response) error {
+// HandleResponseBody copies the response header and body to writer.
+func HandleResponseBody(w http.ResponseWriter, resp *http.Response) error {
 	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
 	w.WriteHeader(resp.StatusCode)
 	_, err := io.CopyBuffer(w, resp.Body, make([]byte, 1024))
