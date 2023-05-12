@@ -25,15 +25,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/xgfone/go-generics/slices"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/http/processor"
 	"github.com/xgfone/go-loadbalancer/internal/slog"
 )
 
-// Request represents a upstream request context.
-type Request struct {
-	RespBodyProcessor processor.ResponseProcessor
+// Context represents a upstream request context.
+type Context struct {
+	RespProcessor processor.Processor
 
 	SrcRes http.ResponseWriter
 	SrcReq *http.Request
@@ -43,61 +44,61 @@ type Request struct {
 	RID   string
 }
 
-// NewRequest returns a new Request.
-func NewRequest(srcres http.ResponseWriter, srcreq, dstreq *http.Request) Request {
-	return Request{SrcRes: srcres, SrcReq: srcreq, DstReq: dstreq}
+// NewContext returns a new request Context.
+func NewContext(srcres http.ResponseWriter, srcreq, dstreq *http.Request) Context {
+	return Context{SrcRes: srcres, SrcReq: srcreq, DstReq: dstreq}
 }
 
-// WithRespBodyProcessor returns a new Request with the response body processor.
-func (r Request) WithRespBodyProcessor(processor processor.ResponseProcessor) Request {
-	r.RespBodyProcessor = processor
-	return r
+// WithRespProcessor returns a new Request with the response body processor.
+func (c Context) WithRespProcessor(processor processor.Processor) Context {
+	c.RespProcessor = processor
+	return c
 }
 
 // WithRemoteAddr returns a new Request with the remote address.
-func (r Request) WithRemoteAddr(raddr string) Request {
-	r.RAddr = raddr
-	return r
+func (c Context) WithRemoteAddr(raddr string) Context {
+	c.RAddr = raddr
+	return c
 }
 
 // WithRequestID returns a new Request with the request id.
-func (r Request) WithRequestID(rid string) Request {
-	r.RID = rid
-	return r
+func (c Context) WithRequestID(rid string) Context {
+	c.RID = rid
+	return c
 }
 
-// Processor converts itself to the response processor.
-func (r Request) Processor(dstres *http.Response) processor.Response {
-	return processor.NewResponse(r.SrcRes, r.SrcReq, r.DstReq, dstres)
+// ProcessorContext converts itself to the processor context.
+func (c Context) ProcessorContext(dstres *http.Response) processor.Context {
+	return processor.NewContext(c.SrcRes, c.SrcReq, c.DstReq, dstres)
 }
 
 // RequestID returns the request id.
-func (r Request) RequestID() string {
+func (c Context) RequestID() string {
 	switch {
-	case len(r.RID) != 0:
-		return r.RID
-	case r.SrcReq != nil:
-		return r.SrcReq.Header.Get("X-Request-Id")
+	case len(c.RID) != 0:
+		return c.RID
+	case c.SrcReq != nil:
+		return c.SrcReq.Header.Get("X-Request-Id")
 	default:
 		return ""
 	}
 }
 
 // RemoteAddr returns the address of the client.
-func (r Request) RemoteAddr() string {
+func (c Context) RemoteAddr() string {
 	switch {
-	case len(r.RAddr) != 0:
-		return r.RAddr
-	case r.SrcReq != nil:
-		return r.SrcReq.RemoteAddr
+	case len(c.RAddr) != 0:
+		return c.RAddr
+	case c.SrcReq != nil:
+		return c.SrcReq.RemoteAddr
 	default:
 		return ""
 	}
 }
 
 // GetRequest returns the request.
-func (r Request) GetRequest() *http.Request {
-	return r.SrcReq
+func (c Context) GetRequest() *http.Request {
+	return c.SrcReq
 }
 
 // ------------------------------------------------------------------------- //
@@ -183,32 +184,32 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 	s.state.Inc()
 	defer s.state.Dec()
 
-	var r Request
-	switch _req := req.(type) {
-	case Request:
-		r = _req
-	case interface{ GetRequest() Request }:
-		r = _req.GetRequest()
+	var c Context
+	switch r := req.(type) {
+	case Context:
+		c = r
+	case interface{ GetContext() Context }:
+		c = r.GetContext()
 	default:
 		panic(fmt.Errorf("HttpEndpoint.Serve: unsupported req type '%T'", req))
 	}
 
-	r.DstReq.RequestURI = ""
-	r.DstReq.URL.Host = s.id
+	c.DstReq.RequestURI = ""
+	c.DstReq.URL.Host = s.id
 
 	start := time.Now()
 	var statusCode int
-	resp, err := s.do(ctx, r.DstReq)
+	resp, err := s.do(ctx, c.DstReq)
 	if resp != nil {
 		statusCode = resp.StatusCode
 		defer resp.Body.Close()
 	}
 
 	if err == nil {
-		if r.RespBodyProcessor != nil {
-			err = r.RespBodyProcessor.Process(ctx, r.Processor(resp), nil)
+		if c.RespProcessor != nil {
+			err = c.RespProcessor.Process(ctx, c.ProcessorContext(resp), nil)
 		} else {
-			err = HandleResponseBody(r.SrcRes, resp)
+			err = HandleResponseBody(c.SrcRes, resp)
 		}
 	}
 
@@ -217,25 +218,25 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 		s.state.IncSuccess()
 		if slog.Enabled(ctx, slog.LevelDebug) {
 			var srcreq map[string]string
-			if r.SrcReq != nil {
+			if c.SrcReq != nil {
 				srcreq = map[string]string{
-					"raddr":  r.SrcReq.RemoteAddr,
-					"method": r.SrcReq.Method,
-					"host":   r.SrcReq.Host,
-					"path":   r.SrcReq.URL.Path,
-					"uri":    r.SrcReq.RequestURI,
+					"raddr":  c.SrcReq.RemoteAddr,
+					"method": c.SrcReq.Method,
+					"host":   c.SrcReq.Host,
+					"path":   c.SrcReq.URL.Path,
+					"uri":    c.SrcReq.RequestURI,
 				}
 			}
 
 			slog.Debug("forward the http request to the backend http endpoint",
 				"epid", s.id,
-				"reqid", r.RequestID(),
+				"reqid", c.RequestID(),
 				"srcreq", srcreq,
 				"dstreq", map[string]interface{}{
-					"method": r.DstReq.Method,
-					"host":   r.DstReq.Host,
-					"addr":   r.DstReq.URL.Host,
-					"path":   r.DstReq.URL.Path,
+					"method": c.DstReq.Method,
+					"host":   c.DstReq.Host,
+					"addr":   c.DstReq.URL.Host,
+					"path":   c.DstReq.URL.Path,
 					"code":   statusCode,
 				},
 				"start", start.Unix(),
@@ -244,25 +245,25 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 		}
 	} else {
 		var srcreq map[string]string
-		if r.SrcReq != nil {
+		if c.SrcReq != nil {
 			srcreq = map[string]string{
-				"raddr":  r.SrcReq.RemoteAddr,
-				"method": r.SrcReq.Method,
-				"host":   r.SrcReq.Host,
-				"path":   r.SrcReq.URL.Path,
-				"uri":    r.SrcReq.RequestURI,
+				"raddr":  c.SrcReq.RemoteAddr,
+				"method": c.SrcReq.Method,
+				"host":   c.SrcReq.Host,
+				"path":   c.SrcReq.URL.Path,
+				"uri":    c.SrcReq.RequestURI,
 			}
 		}
 
 		slog.Error("forward the http request to the backend http endpoint",
 			"epid", s.id,
-			"reqid", r.RequestID(),
+			"reqid", c.RequestID(),
 			"srcreq", srcreq,
 			"dstreq", map[string]interface{}{
-				"method": r.DstReq.Method,
-				"host":   r.DstReq.Host,
-				"addr":   r.DstReq.URL.Host,
-				"path":   r.DstReq.URL.Path,
+				"method": c.DstReq.Method,
+				"host":   c.DstReq.Host,
+				"addr":   c.DstReq.URL.Host,
+				"path":   c.DstReq.URL.Path,
 				"code":   statusCode,
 			},
 			"start", start.Unix(),
@@ -285,7 +286,7 @@ func (s *server) Check(ctx context.Context, req interface{}) (ok bool) {
 	case *http.Request:
 		return s.checkHTTP(ctx, r)
 
-	case Request:
+	case Context:
 		return s.checkHTTP(ctx, r.DstReq)
 
 	case nil:
@@ -327,9 +328,30 @@ func (s *server) do(ctx context.Context, req *http.Request) (*http.Response, err
 	return http.DefaultClient.Do(req)
 }
 
+// Define some header keys to be used HandleResponseBody.
+var (
+	// If not empty, ignore the headers.
+	IgnoredRespHeaders = []string{} //{"Host", "Connection"}
+
+	// If not empty, just allow the headers.
+	AllowedRespHeaders []string
+)
+
 // HandleResponseBody copies the response header and body to writer.
 func HandleResponseBody(w http.ResponseWriter, resp *http.Response) error {
-	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	header := w.Header()
+	for k, vs := range resp.Header {
+		if len(IgnoredRespHeaders) > 0 && slices.Contains(IgnoredRespHeaders, k) {
+			continue
+		}
+
+		if len(AllowedRespHeaders) > 0 && !slices.Contains(AllowedRespHeaders, k) {
+			continue
+		}
+
+		header[k] = vs
+	}
+
 	w.WriteHeader(resp.StatusCode)
 	_, err := io.CopyBuffer(w, resp.Body, make([]byte, 1024))
 	return loadbalancer.NewError(false, err)

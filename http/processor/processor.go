@@ -14,3 +14,172 @@
 
 // Package processor provides some common request and response processors.
 package processor
+
+import (
+	"context"
+	"net/http"
+)
+
+var (
+	_ Processor = ProcessorFunc(nil)
+	_ Processor = Processors(nil)
+)
+
+type (
+	// Context represents a processor context.
+	Context struct {
+		SrcRes http.ResponseWriter
+		SrcReq *http.Request
+		DstReq *http.Request
+		DstRes *http.Response
+	}
+
+	// Processor is used to process the request or response.
+	Processor interface {
+		Process(context.Context, Context, error) error
+	}
+
+	// ExtProcessor is an extended processor.
+	ExtProcessor interface {
+		String() string
+		Type() string
+		Processor
+	}
+
+	// ProcessorFunc is the processor function.
+	ProcessorFunc func(ctx context.Context, pc Context, err error) error
+
+	// Processors represents a group of processors.
+	Processors []Processor
+)
+
+// WithSrcRes returns a new processor Context with the http response writer as SrcRes.
+func (c Context) WithSrcRes(rw http.ResponseWriter) Context {
+	c.SrcRes = rw
+	return c
+}
+
+// WithSrcReq returns a new processor Context with the http request as SrcReq.
+func (c Context) WithSrcReq(req *http.Request) Context {
+	c.SrcReq = req
+	return c
+}
+
+// WithDstReq returns a new processor Context with the http request as DstReq.
+func (c Context) WithDstReq(req *http.Request) Context {
+	c.DstReq = req
+	return c
+}
+
+// WithDstRes returns a new processor Context with the http response as DstRes.
+func (c Context) WithDstRes(res *http.Response) Context {
+	c.DstRes = res
+	return c
+}
+
+// Process implements the interface Processor.
+//
+// f may be nil, which is equal to do nothing and return the original error.
+func (f ProcessorFunc) Process(ctx context.Context, pc Context, err error) error {
+	if f != nil {
+		err = f(ctx, pc, err)
+	}
+	return err
+}
+
+// Process implements the interface Processor.
+func (ps Processors) Process(ctx context.Context, c Context, err error) error {
+	for i, _len := 0, len(ps); i < _len; i++ {
+		err = ps[i].Process(ctx, c, err)
+	}
+	return err
+}
+
+// NewContext returns a new Context.
+func NewContext(srcres http.ResponseWriter, srcreq, dstreq *http.Request, dstres *http.Response) Context {
+	return Context{
+		SrcRes: srcres,
+		SrcReq: srcreq,
+		DstReq: dstreq,
+		DstRes: dstres,
+	}
+}
+
+// None is equal to ProcessorFunc(nil).
+func None() Processor { return ProcessorFunc(nil) }
+
+// Request is a convenient function to return a simple request processor.
+func Request(f func(*http.Request)) Processor {
+	return ProcessorFunc(func(ctx context.Context, pc Context, err error) error {
+		f(pc.DstReq)
+		return err
+	})
+}
+
+// Response is a convenient function to a simple response processor.
+func Response(f func(http.ResponseWriter, *http.Response, error) error) Processor {
+	return ProcessorFunc(func(_ context.Context, c Context, err error) error {
+		return f(c.SrcRes, c.DstRes, err)
+	})
+}
+
+// CompactProcessors compacts a group of processors to a processor,
+// which will eliminate the empty processor.
+func CompactProcessors(processors ...Processor) Processors {
+	_processors := make(Processors, 0, len(processors))
+	for _, processor := range processors {
+		switch p := processor.(type) {
+		case nil:
+		case ProcessorFunc:
+			if p != nil {
+				_processors = append(_processors, p)
+			}
+		case Processors:
+			if len(p) > 0 {
+				_processors = append(_processors, CompactProcessors(p...)...)
+			}
+		default:
+			_processors = append(_processors, p)
+		}
+	}
+	return _processors
+}
+
+// GetProcessorType returns the type of the processor if it is an ExtProcessor.
+// Or, reutrn "".
+func GetProcessorType(processor Processor) string {
+	for {
+		switch p := processor.(type) {
+		case ExtProcessor:
+			return p.Type()
+		case interface{ Unwrap() Processor }:
+			return GetProcessorType(p.Unwrap())
+		default:
+			return ""
+		}
+	}
+}
+
+// NewExtProcessor returns a new ExtProcessor.
+func NewExtProcessor(ptype, desc string, processor Processor) ExtProcessor {
+	if ptype == "" {
+		panic("ExtProcessor: type must not be empty")
+	}
+	if desc == "" {
+		panic("ExtProcessor: desc must not be empty")
+	}
+	if processor == nil {
+		panic("ExtProcessor: processor must not be nil")
+	}
+	return extProcessor{ptype: ptype, pdesc: desc, Processor: processor}
+}
+
+type extProcessor struct {
+	ptype string
+	pdesc string
+	Processor
+}
+
+func (p extProcessor) String() string    { return p.pdesc }
+func (p extProcessor) Type() string      { return p.ptype }
+func (p extProcessor) Unwrap() Processor { return p.Processor }

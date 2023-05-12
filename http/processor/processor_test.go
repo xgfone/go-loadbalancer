@@ -19,10 +19,22 @@ import (
 	"testing"
 )
 
-func TestCompactRequestProcessors(t *testing.T) {
-	nothing := func(context.Context, Request) {}
-	processors := CompactRequestProcessors(nil, NoneRequestProcessor(), RequestProcessorFunc(nothing))
+func nothing(_ context.Context, _ Context, e error) error { return e }
+
+func TestCompactProcessors(t *testing.T) {
+	processors := CompactProcessors(nil, None(), ProcessorFunc(nothing))
 	if _len := len(processors); _len != 1 {
-		t.Errorf("expect %d request processor, but got %d", 1, _len)
+		t.Errorf("expect %d processor, but got %d", 1, _len)
+	}
+}
+
+func TestGetProcessorType(t *testing.T) {
+	f := func(p ExtProcessor) Processor { return p }
+
+	ps := CompactProcessors(f(NewExtProcessor("t1", "t1", ProcessorFunc(nothing))))
+	for _, p := range ps {
+		if pt := GetProcessorType(p); pt != "t1" {
+			t.Errorf("expect processor type '%s', but got '%s'", "t1", pt)
+		}
 	}
 }

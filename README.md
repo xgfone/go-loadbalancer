@@ -13,12 +13,10 @@ $ go get -u github.com/xgfone/go-loadbalancer
 package main
 
 import (
-	"errors"
 	"flag"
 	"net/http"
 
 	"github.com/xgfone/go-binder"
-	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/forwarder"
@@ -87,45 +85,11 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 	http.HandleFunc(req.Path, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != req.Method {
 			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-
-		// 1. Create a new request.
-		ctx := r.Context()
-		req := r.Clone(ctx)
-		req.URL.Scheme = "http"
-		req.RequestURI = "" // Pretend to be a client request.
-		//req.URL.Host = "" // Dial to the backend http endpoint.
-
-		// 2. Process the request.
-		// TODO ...
-
-		// 3. Forward the request and handle the response.
-		err := forwarder.Serve(ctx, httpep.NewRequest(w, r, req))
-		switch {
-		case err == nil: // Success
-
-		case err == loadbalancer.ErrNoAvailableEndpoints:
-			w.WriteHeader(503) // Service Unavailable
-
-		case IsTimeout(err):
-			w.WriteHeader(504) // Gateway Timeout
-
-		default:
-			w.WriteHeader(502) // Bad Gateway
+		} else {
+			// You can use forwarder.ForwardHTTP to control the request and response.
+			forwarder.ServeHTTP(w, r)
 		}
 	})
-}
-
-type timeoutError interface {
-	Timeout() bool
-	error
-}
-
-// IsTimeout reports whether the error is timeout.
-func IsTimeout(err error) bool {
-	var timeoutErr timeoutError
-	return errors.As(err, &timeoutErr) && timeoutErr.Timeout()
 }
 ```
 

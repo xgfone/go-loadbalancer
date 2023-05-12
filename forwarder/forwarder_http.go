@@ -34,13 +34,13 @@ func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // ForwardHTTP is the same as Serve, but only for http, which is a simple
-// implementation and uses "http/endpoint".Request as the request context.
+// implementation and uses "http/endpoint".Context as the request context.
 //
 // It uses "github.com/xgfone/go-defaults".HTTPIsRespondedFunc to check
 // whether the response is responded or not. And it may be overrided
 // for the complex http.ResponseWriter.
 func (f *Forwarder) ForwardHTTP(ctx context.Context, w http.ResponseWriter, r *http.Request,
-	reqProcessor processor.RequestProcessor, resBodyProcessor processor.ResponseProcessor) error {
+	reqProcessor processor.Processor, resProcessor processor.Processor) error {
 
 	// 1. Create a new request.
 	req := r.Clone(ctx)
@@ -51,31 +51,32 @@ func (f *Forwarder) ForwardHTTP(ctx context.Context, w http.ResponseWriter, r *h
 	}
 
 	// 2. Process the request.
+	c := processor.NewContext(w, r, req, nil)
 	if reqProcessor != nil {
-		reqProcessor.Process(ctx, processor.NewRequest(req))
+		reqProcessor.Process(ctx, c, nil)
 	}
 
 	// 3. Handle the response processor.
-	if resBodyProcessor == nil {
-		resBodyProcessor = processor.SimpleResponseProcessor(defaultRespBodyProcessor)
+	if resProcessor == nil {
+		resProcessor = processor.Response(defaultRespBodyProcessor)
 	}
-	resBodyProcessor = wrapResponseProcessor(resBodyProcessor)
+	resProcessor = wrapResponseProcessor(resProcessor)
 
 	// 3. Forward the request and handle the response.
-	err := f.Serve(ctx, endpoint.NewRequest(w, r, req).WithRespBodyProcessor(resBodyProcessor))
+	err := f.Serve(ctx, endpoint.NewContext(w, r, req).WithRespProcessor(resProcessor))
 	if err != nil {
-		err = resBodyProcessor.Process(ctx, processor.NewResponse(w, r, req, nil), err)
+		err = resProcessor.Process(ctx, c, err)
 	}
 
 	return err
 }
 
-func wrapResponseProcessor(p processor.ResponseProcessor) processor.ResponseProcessor {
-	return processor.ResponseProcessorFunc(func(ctx context.Context, r processor.Response, err error) error {
-		if !defaults.HTTPIsResponded(ctx, r.SrcRes, r.SrcReq) {
-			err = p.Process(ctx, r, err)
-		} else if err == nil && r.SrcRes != nil {
-			panic(fmt.Errorf("re-respond for %s %s", r.SrcReq.Method, r.SrcReq.RequestURI))
+func wrapResponseProcessor(p processor.Processor) processor.Processor {
+	return processor.ProcessorFunc(func(ctx context.Context, c processor.Context, err error) error {
+		if !defaults.HTTPIsResponded(ctx, c.SrcRes, c.SrcReq) {
+			err = p.Process(ctx, c, err)
+		} else if err == nil && c.SrcRes != nil {
+			panic(fmt.Errorf("re-respond for %s %s", c.SrcReq.Method, c.SrcReq.RequestURI))
 		}
 		return err
 	})
