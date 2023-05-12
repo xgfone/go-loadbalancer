@@ -35,12 +35,15 @@ func init() {
 }
 
 // Builder is used to build a new Balancer with the config.
-type Builder func(config interface{}) (Balancer, error)
+type Builder func(policy string, config interface{}) (Balancer, error)
 
 // RegisterBuidler registers the balancer builder for the given policy.
 //
-// If the balancer builder of "policy" has existed, override it to the new.
+// If the balancer builder for policy has existed, override it to the new.
 func RegisterBuidler(policy string, builder Builder) {
+	if builder == nil {
+		panic("balancer builder must not be nil")
+	}
 	builders[policy] = builder
 }
 
@@ -56,16 +59,16 @@ func RegisterBuidler(policy string, builder Builder) {
 //	source_ip_hash
 //	least_conn
 func RegisterBalancer(b Balancer) {
-	RegisterBuidler(b.Policy(), func(interface{}) (Balancer, error) { return b, nil })
+	RegisterBuidler(b.Policy(), func(string, interface{}) (Balancer, error) { return b, nil })
 }
 
 // GetBuilder returns the registered balancer builder by the policy.
 //
-// If the balancer builder of "policy" does not exist, return nil.
+// If the balancer builder for policy does not exist, return nil.
 func GetBuilder(policy string) Builder { return builders[policy] }
 
-// GetAllBuilderPolicies returns the policies of all the balancer builders.
-func GetAllBuilderPolicies() []string {
+// GetAllPolicies returns the policies of all the balancer builders.
+func GetAllPolicies() []string {
 	policies := make([]string, 0, len(builders))
 	for policy := range builders {
 		policies = append(policies, policy)
@@ -73,12 +76,12 @@ func GetAllBuilderPolicies() []string {
 	return policies
 }
 
-// Build is a convenient function to build a new balancer of "policy".
+// Build is a convenient function to build a new balancer for policy.
 func Build(policy string, config interface{}) (balancer Balancer, err error) {
-	if builder := GetBuilder(policy); builder != nil {
-		balancer, err = builder(config)
-	} else {
-		err = fmt.Errorf("no the balancer builder of the policy '%s'", policy)
+	if builder := GetBuilder(policy); builder == nil {
+		err = fmt.Errorf("no the balancer builder for the policy '%s'", policy)
+	} else if balancer, err = builder(policy, config); err == nil && balancer == nil {
+		panic(fmt.Errorf("balancer builder for the policy '%s' returns a nil", policy))
 	}
 	return
 }
