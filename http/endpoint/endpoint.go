@@ -34,7 +34,7 @@ import (
 
 // Context represents a upstream request context.
 type Context struct {
-	Response processor.ResponseProcessor
+	processor.ResponseProcessor
 
 	SrcRes http.ResponseWriter
 	SrcReq *http.Request
@@ -51,7 +51,7 @@ func NewContext(srcres http.ResponseWriter, srcreq, dstreq *http.Request) Contex
 
 // WithResponseProcessor returns a new request Context with the response processor.
 func (c Context) WithResponseProcessor(processor processor.ResponseProcessor) Context {
-	c.Response = processor
+	c.ResponseProcessor = processor
 	return c
 }
 
@@ -207,8 +207,8 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 
 	if err != nil {
 		err = loadbalancer.NewForwardError(err)
-	} else if c.Response != nil {
-		err = c.Response.ProcessResponse(ctx, c.ProcessorContext(), resp)
+	} else if c.ResponseProcessor != nil {
+		err = c.ProcessResponse(ctx, c.ProcessorContext(), resp)
 	} else {
 		err = HandleResponseBody(c.SrcRes, resp)
 	}
