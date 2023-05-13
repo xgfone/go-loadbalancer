@@ -16,11 +16,9 @@ package forwarder
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 
-	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/http/endpoint"
 	"github.com/xgfone/go-loadbalancer/http/processor"
@@ -28,9 +26,9 @@ import (
 )
 
 // ServeHTTP implements the interface http.Handler, which is eqaul to
-// f.ForwardHTTP(r.Context(), w, r, nil, nil).
+// f.ForwardHTTP(r.Context(), w, r, nil, nil, nil).
 func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	f.ForwardHTTP(r.Context(), w, r, nil, nil)
+	f.ForwardHTTP(r.Context(), w, r, nil, nil, nil)
 }
 
 // ForwardHTTP is the same as Serve, but only for http, which is a simple
@@ -40,7 +38,8 @@ func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // whether the response is responded or not. And it may be overrided
 // for the complex http.ResponseWriter.
 func (f *Forwarder) ForwardHTTP(ctx context.Context, w http.ResponseWriter, r *http.Request,
-	reqProcessor processor.Processor, resProcessor processor.Processor) error {
+	reqProcessor processor.Processor, resHeaderProcessor processor.Processor,
+	resBodyProcessor processor.ResponseProcessor) error {
 
 	// 1. Create a new request.
 	req := r.Clone(ctx)
@@ -51,54 +50,42 @@ func (f *Forwarder) ForwardHTTP(ctx context.Context, w http.ResponseWriter, r *h
 	}
 
 	// 2. Process the request.
-	c := processor.NewContext(w, r, req, nil)
+	c := processor.NewContext(w, r, req)
 	if reqProcessor != nil {
-		reqProcessor.Process(ctx, c, nil)
+		reqProcessor.Process(ctx, c)
 	}
 
-	// 3. Handle the response processor.
-	if resProcessor == nil {
-		resProcessor = processor.Response(defaultRespBodyProcessor)
+	// 3. Handle the response body processor.
+	if resBodyProcessor == nil {
+		resBodyProcessor = processor.ResponseProcessorFunc(defaultRespBodyProcessor)
 	}
-	resProcessor = wrapResponseProcessor(resProcessor)
 
 	// 3. Forward the request and handle the response.
-	err := f.Serve(ctx, endpoint.NewContext(w, r, req).WithRespProcessor(resProcessor))
+	err := f.Serve(ctx, endpoint.NewContext(w, r, req).WithResponseProcessor(resBodyProcessor))
 	if err != nil {
-		err = resProcessor.Process(ctx, c, err)
+		err = resBodyProcessor.ProcessError(ctx, c, err)
 	}
 
 	return err
 }
 
-func wrapResponseProcessor(p processor.Processor) processor.Processor {
-	return processor.ProcessorFunc(func(ctx context.Context, c processor.Context, err error) error {
-		if !defaults.HTTPIsResponded(ctx, c.SrcRes, c.SrcReq) {
-			err = p.Process(ctx, c, err)
-		} else if err == nil && c.SrcRes != nil {
-			panic(fmt.Errorf("re-respond for %s %s", c.SrcReq.Method, c.SrcReq.RequestURI))
-		}
-		return err
-	})
-}
-
-func defaultRespBodyProcessor(w http.ResponseWriter, r *http.Response, err error) error {
+func defaultRespBodyProcessor(_ context.Context, pc processor.Context, r *http.Response, err error) error {
 	switch {
 	case err == nil:
-		err = endpoint.HandleResponseBody(w, r) // Success
+		err = endpoint.HandleResponseBody(pc.SrcRes, r) // Success
 
 	case err == loadbalancer.ErrNoAvailableEndpoints:
-		w.WriteHeader(503) // Service Unavailable
+		pc.SrcRes.WriteHeader(503) // Service Unavailable
 
 	case nets.IsTimeout(err):
-		w.WriteHeader(504) // Gateway Timeout
+		pc.SrcRes.WriteHeader(504) // Gateway Timeout
 
 	default:
 		if h, ok := err.(http.Handler); ok {
-			h.ServeHTTP(w, nil)
+			h.ServeHTTP(pc.SrcRes, nil)
 		} else {
-			w.WriteHeader(502) // Bad Gateway
-			_, err = io.WriteString(w, err.Error())
+			pc.SrcRes.WriteHeader(502) // Bad Gateway
+			_, err = io.WriteString(pc.SrcRes, err.Error())
 		}
 	}
 	return err

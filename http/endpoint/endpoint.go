@@ -34,7 +34,7 @@ import (
 
 // Context represents a upstream request context.
 type Context struct {
-	RespProcessor processor.Processor
+	Response processor.ResponseProcessor
 
 	SrcRes http.ResponseWriter
 	SrcReq *http.Request
@@ -49,27 +49,27 @@ func NewContext(srcres http.ResponseWriter, srcreq, dstreq *http.Request) Contex
 	return Context{SrcRes: srcres, SrcReq: srcreq, DstReq: dstreq}
 }
 
-// WithRespProcessor returns a new Request with the response body processor.
-func (c Context) WithRespProcessor(processor processor.Processor) Context {
-	c.RespProcessor = processor
+// WithResponseProcessor returns a new request Context with the response processor.
+func (c Context) WithResponseProcessor(processor processor.ResponseProcessor) Context {
+	c.Response = processor
 	return c
 }
 
-// WithRemoteAddr returns a new Request with the remote address.
+// WithRemoteAddr returns a new request Context with the remote address.
 func (c Context) WithRemoteAddr(raddr string) Context {
 	c.RAddr = raddr
 	return c
 }
 
-// WithRequestID returns a new Request with the request id.
+// WithRequestID returns a new request Context with the request id.
 func (c Context) WithRequestID(rid string) Context {
 	c.RID = rid
 	return c
 }
 
 // ProcessorContext converts itself to the processor context.
-func (c Context) ProcessorContext(dstres *http.Response) processor.Context {
-	return processor.NewContext(c.SrcRes, c.SrcReq, c.DstReq, dstres)
+func (c Context) ProcessorContext() processor.Context {
+	return processor.NewContext(c.SrcRes, c.SrcReq, c.DstReq)
 }
 
 // RequestID returns the request id.
@@ -205,12 +205,12 @@ func (s *server) Serve(ctx context.Context, req interface{}) (err error) {
 		defer resp.Body.Close()
 	}
 
-	if err == nil {
-		if c.RespProcessor != nil {
-			err = c.RespProcessor.Process(ctx, c.ProcessorContext(resp), nil)
-		} else {
-			err = HandleResponseBody(c.SrcRes, resp)
-		}
+	if err != nil {
+		err = loadbalancer.NewForwardError(err)
+	} else if c.Response != nil {
+		err = c.Response.ProcessResponse(ctx, c.ProcessorContext(), resp)
+	} else {
+		err = HandleResponseBody(c.SrcRes, resp)
 	}
 
 	cost := time.Since(start)

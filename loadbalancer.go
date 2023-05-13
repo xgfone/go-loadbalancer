@@ -20,6 +20,24 @@ import "errors"
 // ErrNoAvailableEndpoints is used to represents no available endpoints.
 var ErrNoAvailableEndpoints = errors.New("no available endpoints")
 
+// ForwardError represents a forward error.
+type ForwardError struct{ Err error }
+
+// NewForwardError returns a new forward error.
+func NewForwardError(err error) ForwardError { return ForwardError{err} }
+
+// Error implements the error interface.
+func (e ForwardError) Error() string { return e.Error() }
+
+// Unwrap returns the inner wrapped error.
+func (e ForwardError) Unwrap() error { return e.Err }
+
+// ErrIsForward reports whether the error is a forward error.
+func ErrIsForward(err error) bool {
+	_, ok := err.(ForwardError)
+	return ok
+}
+
 // RetryError represents a no-retry error.
 type RetryError interface {
 	Retry() bool
@@ -27,8 +45,6 @@ type RetryError interface {
 }
 
 // NewRetryError returns a new retry error.
-//
-// err may be nil, which is just used to indicate whether to retry.
 func NewRetryError(retry bool, err error) RetryError {
 	return retryError{retry: retry, err: err}
 }

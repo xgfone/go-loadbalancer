@@ -31,12 +31,11 @@ type (
 		SrcRes http.ResponseWriter
 		SrcReq *http.Request
 		DstReq *http.Request
-		DstRes *http.Response
 	}
 
 	// Processor is used to process the request or response.
 	Processor interface {
-		Process(context.Context, Context, error) error
+		Process(context.Context, Context) error
 	}
 
 	// ExtProcessor is an extended processor.
@@ -47,7 +46,7 @@ type (
 	}
 
 	// ProcessorFunc is the processor function.
-	ProcessorFunc func(ctx context.Context, pc Context, err error) error
+	ProcessorFunc func(ctx context.Context, pc Context) error
 
 	// Processors represents a group of processors.
 	Processors []Processor
@@ -71,55 +70,55 @@ func (c Context) WithDstReq(req *http.Request) Context {
 	return c
 }
 
-// WithDstRes returns a new processor Context with the http response as DstRes.
-func (c Context) WithDstRes(res *http.Response) Context {
-	c.DstRes = res
-	return c
-}
-
 // Process implements the interface Processor.
 //
-// f may be nil, which is equal to do nothing and return the original error.
-func (f ProcessorFunc) Process(ctx context.Context, pc Context, err error) error {
-	if f != nil {
-		err = f(ctx, pc, err)
+// f may be nil, which is equal to do nothing and return nil.
+func (f ProcessorFunc) Process(ctx context.Context, pc Context) error {
+	if f == nil {
+		return nil
 	}
-	return err
+	return f(ctx, pc)
 }
 
 // Process implements the interface Processor.
-func (ps Processors) Process(ctx context.Context, c Context, err error) error {
+func (ps Processors) Process(ctx context.Context, pc Context) (err error) {
 	for i, _len := 0, len(ps); i < _len; i++ {
-		err = ps[i].Process(ctx, c, err)
+		if err = ps[i].Process(ctx, pc); err != nil {
+			return
+		}
 	}
-	return err
+	return
 }
 
 // NewContext returns a new Context.
-func NewContext(srcres http.ResponseWriter, srcreq, dstreq *http.Request, dstres *http.Response) Context {
-	return Context{
-		SrcRes: srcres,
-		SrcReq: srcreq,
-		DstReq: dstreq,
-		DstRes: dstres,
-	}
+func NewContext(srcres http.ResponseWriter, srcreq, dstreq *http.Request) Context {
+	return Context{SrcRes: srcres, SrcReq: srcreq, DstReq: dstreq}
 }
 
 // None is equal to ProcessorFunc(nil).
 func None() Processor { return ProcessorFunc(nil) }
 
-// Request is a convenient function to return a simple request processor.
-func Request(f func(*http.Request)) Processor {
-	return ProcessorFunc(func(ctx context.Context, pc Context, err error) error {
-		f(pc.DstReq)
-		return err
+// NoError converts a function without return to a processor.
+func NoError(f func(ctx context.Context, pc Context)) Processor {
+	return ProcessorFunc(func(ctx context.Context, pc Context) error {
+		f(ctx, pc)
+		return nil
 	})
 }
 
-// Response is a convenient function to a simple response processor.
-func Response(f func(http.ResponseWriter, *http.Response, error) error) Processor {
-	return ProcessorFunc(func(_ context.Context, c Context, err error) error {
-		return f(c.SrcRes, c.DstRes, err)
+// Request is a convenient function to return a simple request processor.
+func Request(f func(*http.Request)) Processor {
+	return ProcessorFunc(func(ctx context.Context, pc Context) error {
+		f(pc.DstReq)
+		return nil
+	})
+}
+
+// ResponseHeader is a convenient function to a simple response header processor.
+func ResponseHeader(f func(http.ResponseWriter)) Processor {
+	return ProcessorFunc(func(_ context.Context, pc Context) error {
+		f(pc.SrcRes)
+		return nil
 	})
 }
 

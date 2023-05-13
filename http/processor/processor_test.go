@@ -19,7 +19,7 @@ import (
 	"testing"
 )
 
-func nothing(_ context.Context, _ Context, e error) error { return e }
+func nothing(_ context.Context, _ Context) error { return nil }
 
 func TestCompactProcessors(t *testing.T) {
 	processors := CompactProcessors(nil, None(), ProcessorFunc(nothing))
