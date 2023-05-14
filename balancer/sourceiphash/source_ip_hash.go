@@ -18,7 +18,9 @@ package sourceiphash
 import (
 	"context"
 	"encoding/binary"
+	"net"
 	"net/netip"
+	"strings"
 
 	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
@@ -30,7 +32,7 @@ import (
 type Balancer struct {
 	// GetSourceAddr is used to get the source address.
 	//
-	// If nil, use defaults.GetRemoteAddr instead.
+	// If nil, parse the remote address from defaults.GetRemoteAddr.
 	GetSourceAddr func(ctx context.Context, req interface{}) (netip.Addr, error)
 
 	policy string
@@ -65,7 +67,7 @@ func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discove
 	var err error
 	var sip netip.Addr
 	if b.GetSourceAddr == nil {
-		sip, err = defaults.GetRemoteAddr(c, r)
+		sip, err = parseRemoteAddr(defaults.GetRemoteAddr(c, r))
 	} else {
 		sip, err = b.GetSourceAddr(c, r)
 	}
@@ -89,4 +91,29 @@ func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discove
 	}
 
 	return eps[value%uint64(_len)].Serve(c, r)
+}
+
+func parseRemoteAddr(raddr string) (ip netip.Addr, err error) {
+	if strings.IndexByte(raddr, '.') == -1 {
+		if strings.IndexByte(raddr, '[') == -1 { // ipv6
+			return netip.ParseAddr(raddr)
+		}
+
+		// ipv6:port
+		var host string
+		if host, _, err = net.SplitHostPort(raddr); err == nil {
+			ip, err = netip.ParseAddr(host)
+		}
+	} else {
+		if strings.IndexByte(raddr, ':') == -1 { // ipv4
+			return netip.ParseAddr(raddr)
+		}
+
+		// ipv4:port
+		var host string
+		if host, _, err = net.SplitHostPort(raddr); err == nil {
+			ip, err = netip.ParseAddr(host)
+		}
+	}
+	return
 }
