@@ -28,6 +28,8 @@ var (
 type (
 	// Context represents a processor context.
 	Context struct {
+		CtxData interface{}
+
 		SrcRes http.ResponseWriter
 		SrcReq *http.Request
 		DstReq *http.Request
@@ -51,6 +53,12 @@ type (
 	// Processors represents a group of processors.
 	Processors []Processor
 )
+
+// WithContext returns a new processor Context with the context data.
+func (c Context) WithContext(ctxData interface{}) Context {
+	c.CtxData = ctxData
+	return c
+}
 
 // WithSrcRes returns a new processor Context with the http response writer as SrcRes.
 func (c Context) WithSrcRes(rw http.ResponseWriter) Context {
