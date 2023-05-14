@@ -29,7 +29,7 @@ var DefaultBalancer Balancer = roundrobin.NewWeightedBalancer("")
 
 // Forwarder is used to forward the request to one of the backend endpoints.
 type Forwarder interface {
-	Forward(ctx context.Context, req interface{}, sd endpoint.Discovery) error
+	Forward(ctx context.Context, req interface{}, sd endpoint.Discovery) (interface{}, error)
 }
 
 // Balancer does a balancer to forward the request to one of the backend

@@ -45,11 +45,11 @@ func (ep *TestEndpoint) State() endpoint.State {
 	}
 	return state
 }
-func (ep *TestEndpoint) Serve(c context.Context, r interface{}) error {
+func (ep *TestEndpoint) Serve(c context.Context, r interface{}) (interface{}, error) {
 	ep.state.IncSuccess()
 	ep.state.Inc()
 	ep.state.Dec()
-	return nil
+	return nil, nil
 }
 
 // NewEndpoint returns a new endpoint to do the test.

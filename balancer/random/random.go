@@ -34,11 +34,11 @@ func NewBalancer(policy string) *Balancer {
 }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) error {
+func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
 	eps := sd.OnEndpoints()
 	switch _len := len(eps); _len {
 	case 0:
-		return loadbalancer.ErrNoAvailableEndpoints
+		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
 		return eps[0].Serve(c, r)
 	default:
@@ -58,12 +58,12 @@ func NewWeightedBalancer(policy string) *WeightedBalancer {
 }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *WeightedBalancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) error {
+func (b *WeightedBalancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
 	eps := sd.OnEndpoints()
 	_len := len(eps)
 	switch _len {
 	case 0:
-		return loadbalancer.ErrNoAvailableEndpoints
+		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
 		return eps[0].Serve(c, r)
 	}

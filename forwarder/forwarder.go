@@ -118,14 +118,14 @@ func (f *Forwarder) EndpointManager() *endpoint.Manager { return f.epmanager }
 //	interface{ RemoteAddr() net.IP }
 //	interface{ RemoteAddr() net.Addr }
 //	interface{ RemoteAddr() netip.Addr }
-func (f *Forwarder) Serve(ctx context.Context, req interface{}) error {
+func (f *Forwarder) Serve(ctx context.Context, req interface{}) (interface{}, error) {
 	ed := f.GetEndpointDiscovery()
 	if ed == nil {
 		ed = f.epmanager
 	}
 
 	if ed.OnlineNum() <= 0 {
-		return loadbalancer.ErrNoAvailableEndpoints
+		return nil, loadbalancer.ErrNoAvailableEndpoints
 	}
 
 	if timeout := f.GetTimeout(); timeout > 0 {

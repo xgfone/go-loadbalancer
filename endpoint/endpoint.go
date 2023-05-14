@@ -30,7 +30,7 @@ type Endpoint interface {
 
 	// Handler
 	Update(info interface{}) error
-	Serve(ctx context.Context, req interface{}) error
+	Serve(ctx context.Context, req interface{}) (interface{}, error)
 	Check(ctx context.Context, req interface{}) (ok bool)
 }
 
