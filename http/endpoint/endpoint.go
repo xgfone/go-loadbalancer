@@ -29,22 +29,6 @@ import (
 	"github.com/xgfone/go-loadbalancer/internal/slog"
 )
 
-// Request represents the request context of the http endpoint.
-type Request interface {
-	Request() *http.Request
-}
-
-// NewRequest returns a new Request.
-func NewRequest(req *http.Request) Request { return request{req: req} }
-
-var _ Request = NewRequest(nil)
-
-type request struct{ req *http.Request }
-
-func (r request) Request() *http.Request { return r.req }
-
-// ------------------------------------------------------------------------- //
-
 // Config is used to configure and new a http endpoint.
 type Config struct {
 	// Required
@@ -68,18 +52,8 @@ func (c Config) ID() string {
 	return net.JoinHostPort(c.IP, strconv.FormatUint(uint64(c.Port), 10))
 }
 
-// NewEndpoint returns a new endpoint.
-//
-// For the method Serve, req must be one of
-//   - Request
-//   - interface{ GetRequest() Request }
-//
-// For the method Check, req must be one of
-//   - nil
-//   - Request
-//   - *http.Request
-//   - interface{ GetRequest() *http.Request }
-//   - interface{ GetHTTPRequest() *http.Request }
+// NewEndpoint returns a new endpoint, which will get the http request
+// by the function defaults.GetHTTPRequest.
 func (c Config) NewEndpoint() endpoint.WeightedEndpoint {
 	if c.IP == "" {
 		panic("HttpEndpoint: ip must not be empty")
@@ -134,20 +108,7 @@ func (s *server) Serve(ctx context.Context, req interface{}) (res interface{}, e
 	var statusCode int
 	start := time.Now()
 
-	var _req *http.Request
-	switch r := req.(type) {
-	case *http.Request:
-		_req = r
-	case Request:
-		_req = r.Request()
-	case interface{ GetRequest() *http.Request }:
-		_req = r.GetRequest()
-	case interface{ GetHTTPRequest() *http.Request }:
-		_req = r.GetHTTPRequest()
-	default:
-		panic(fmt.Errorf("HttpEndpoint: unsupported request type %T", req))
-	}
-
+	_req := getRequest(ctx, req)
 	_req.URL.Host = s.host
 	resp, err := s.do(ctx, _req)
 	if err == nil {
@@ -174,22 +135,10 @@ func (s *server) Serve(ctx context.Context, req interface{}) (res interface{}, e
 }
 
 func (s *server) Check(ctx context.Context, req interface{}) (ok bool) {
-	switch r := req.(type) {
-	case interface{ GetHTTPRequest() *http.Request }:
-		return s.checkHTTP(ctx, r.GetHTTPRequest())
-
-	case interface{ GetRequest() *http.Request }:
-		return s.checkHTTP(ctx, r.GetRequest())
-
-	case *http.Request:
-		return s.checkHTTP(ctx, r)
-
-	case nil:
+	if req == nil {
 		return s.checkTCP()
-
-	default:
-		panic(fmt.Errorf("HttpEndpoint.Check: unsupported req type '%T'", req))
 	}
+	return s.checkHTTP(ctx, getRequest(ctx, req))
 }
 
 func (s *server) checkHTTP(ctx context.Context, req *http.Request) (ok bool) {
@@ -221,4 +170,11 @@ func (s *server) do(ctx context.Context, req *http.Request) (*http.Response, err
 		return client.Do(req)
 	}
 	return http.DefaultClient.Do(req)
+}
+
+func getRequest(ctx context.Context, req interface{}) *http.Request {
+	if r := defaults.GetHTTPRequest(ctx, req); r != nil {
+		return r
+	}
+	panic(fmt.Errorf("HttpEndpoint: unknown request type %T", req))
 }
