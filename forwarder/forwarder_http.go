@@ -16,15 +16,37 @@ package forwarder
 
 import (
 	"context"
+	"io"
 	"net/http"
 
+	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/http/processor"
+	"github.com/xgfone/go-loadbalancer/internal/nets"
 )
 
-// ServeHTTP implements the interface http.Handler, which is eqaul to
-// f.ForwardHTTP(r.Context(), w, r, nil).
+// ServeHTTP implements the interface http.Handler.
 func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	f.ForwardHTTP(r.Context(), w, r, nil)
+	resp, err := f.ForwardHTTP(r.Context(), w, r, nil)
+	switch {
+	case err == nil:
+		resp := resp.(*http.Response)
+		defer resp.Body.Close()
+		processor.HandleResponse(w, resp) // Success
+
+	case err == loadbalancer.ErrNoAvailableEndpoints:
+		w.WriteHeader(503) // Service Unavailable
+
+	case nets.IsTimeout(err):
+		w.WriteHeader(504) // Gateway Timeout
+
+	default:
+		if h, ok := err.(http.Handler); ok {
+			h.ServeHTTP(w, nil)
+		} else {
+			w.WriteHeader(502) // Bad Gateway
+			io.WriteString(w, err.Error())
+		}
+	}
 }
 
 // ForwardHTTP is the same as Serve, but just a simple implementation for http
