@@ -44,6 +44,12 @@ type Config struct {
 	// Default: do nothing and return resp.
 	HandleResponse func(ep endpoint.Endpoint, resp *http.Response) interface{}
 
+	// Log is used to log the request forwarding.
+	//
+	// If nil, use the default instead to log with the DEBUG level.
+	Log func(ctx context.Context, ep endpoint.Endpoint, start time.Time,
+		req *http.Request, resp *http.Response, err error)
+
 	// If nil, use http.DefaultClient instead.
 	Client *http.Client
 }
@@ -105,32 +111,21 @@ func (s *server) Serve(ctx context.Context, req interface{}) (res interface{}, e
 	s.state.Inc()
 	defer s.state.Dec()
 
-	var statusCode int
 	start := time.Now()
-
 	_req := getRequest(ctx, req)
 	_req.URL.Host = s.host
 	resp, err := s.do(ctx, _req)
 	if err == nil {
-		statusCode = resp.StatusCode
 		s.state.IncSuccess()
+		res = resp
 	}
 
-	if slog.Enabled(ctx, slog.LevelDebug) {
-		slog.Debug("forward the http request to the backend http endpoint",
-			"epid", s.host,
-			"reqid", defaults.GetRequestID(ctx, req),
-			"method", _req.Method,
-			"host", _req.Host,
-			"addr", _req.URL.Host,
-			"path", _req.URL.Path,
-			"code", statusCode,
-			"cost", time.Since(start).String(),
-			"err", err,
-		)
+	if conf := s.getConf(); conf.Log == nil {
+		s.log(ctx, s, start, _req, resp, err)
+	} else {
+		conf.Log(ctx, s, start, _req, resp, err)
 	}
 
-	res = resp
 	return
 }
 
@@ -177,4 +172,28 @@ func getRequest(ctx context.Context, req interface{}) *http.Request {
 		return r
 	}
 	panic(fmt.Errorf("HttpEndpoint: unknown request type %T", req))
+}
+
+func (s *server) log(ctx context.Context, ep endpoint.Endpoint, start time.Time,
+	req *http.Request, resp *http.Response, err error) {
+	if slog.Enabled(ctx, slog.LevelDebug) {
+		var statusCode int
+		if resp != nil {
+			statusCode = resp.StatusCode
+		}
+
+		slog.Debug("forward the http request to the backend http endpoint",
+			"epid", ep.ID(),
+			"reqid", defaults.GetRequestID(ctx, req),
+			"method", req.Method,
+			"host", req.Host,
+			"addr", req.URL.Host,
+			"path", req.URL.Path,
+			"query", req.URL.RawPath,
+			"headers", req.Header,
+			"code", statusCode,
+			"cost", time.Since(start).String(),
+			"err", err,
+		)
+	}
 }
