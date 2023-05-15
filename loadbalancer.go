@@ -27,7 +27,7 @@ type ForwardError struct{ Err error }
 func NewForwardError(err error) ForwardError { return ForwardError{err} }
 
 // Error implements the error interface.
-func (e ForwardError) Error() string { return e.Error() }
+func (e ForwardError) Error() string { return e.Err.Error() }
 
 // Unwrap returns the inner wrapped error.
 func (e ForwardError) Unwrap() error { return e.Err }
