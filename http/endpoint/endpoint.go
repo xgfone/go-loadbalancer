@@ -112,15 +112,20 @@ func (s *server) Serve(ctx context.Context, req interface{}) (res interface{}, e
 	defer s.state.Dec()
 
 	start := time.Now()
+	conf := s.getConf()
 	_req := getRequest(ctx, req)
 	_req.URL.Host = s.host
-	resp, err := s.do(ctx, _req)
+	resp, err := s.do(ctx, conf.Client, _req)
 	if err == nil {
 		s.state.IncSuccess()
-		res = resp
+		if conf.HandleResponse == nil {
+			res = resp
+		} else {
+			res = conf.HandleResponse(s, resp)
+		}
 	}
 
-	if conf := s.getConf(); conf.Log == nil {
+	if conf.Log == nil {
 		s.log(ctx, s, start, _req, resp, err)
 	} else {
 		conf.Log(ctx, s, start, _req, resp, err)
@@ -139,7 +144,7 @@ func (s *server) Check(ctx context.Context, req interface{}) (ok bool) {
 func (s *server) checkHTTP(ctx context.Context, req *http.Request) (ok bool) {
 	req.RequestURI = ""
 	req.URL.Host = s.host
-	resp, err := s.do(ctx, req)
+	resp, err := s.do(ctx, s.getConf().Client, req)
 	ok = err == nil && resp.StatusCode < 500
 	if resp != nil {
 		resp.Body.Close()
@@ -156,12 +161,12 @@ func (s *server) checkTCP() (ok bool) {
 	return
 }
 
-func (s *server) do(ctx context.Context, req *http.Request) (*http.Response, error) {
+func (s *server) do(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
 	if _, ok := ctx.Deadline(); ok {
 		req = req.WithContext(ctx)
 	}
 
-	if client := s.getConf().Client; client != nil {
+	if client != nil {
 		return client.Do(req)
 	}
 	return http.DefaultClient.Do(req)
