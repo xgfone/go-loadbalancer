@@ -37,7 +37,11 @@ func HandleResponse(w http.ResponseWriter, resp *http.Response, filteredHeaders 
 	if len(filteredHeaders) > 0 {
 		header := w.Header()
 		for k, vs := range resp.Header {
-			if !slices.Contains(filteredHeaders, k) {
+			switch {
+			case len(vs) == 0:
+			case len(vs) == 1 && vs[0] == "":
+			case slices.Contains(filteredHeaders, k):
+			default:
 				header[k] = vs
 			}
 		}
