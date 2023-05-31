@@ -4,7 +4,7 @@ github.com/xgfone/go-checker v0.2.0 h1:Nj0u9ZEaBpgz58GJ+xhTYFPtJVPGXkbcdpFXb+SZV
 github.com/xgfone/go-checker v0.2.0/go.mod h1:HNkJUfk+bHfGLsI5PnnX3dYrS6aD+eMkcQDLjP2iWrU=
 github.com/xgfone/go-defaults v0.6.0 h1:D6Hw6ygvpAAUX6bGqD2yd1qiwbSYGF2FDO6eQKz2h6Y=
 github.com/xgfone/go-defaults v0.6.0/go.mod h1:zwcnD8escc6E5QrCNKRLQddb4/hcUnUOM20kUeki18Y=
-github.com/xgfone/go-generics v0.2.0 h1:tWARQxSpa+w+EXBgDKL0Et6WzTYHJpopo4iCvmaI6v0=
-github.com/xgfone/go-generics v0.2.0/go.mod h1:8+Wd/5eVql1eKLRXbMuXi5Q3MZkRAFtiV05wAfVuvqU=
+github.com/xgfone/go-generics v0.3.0 h1:f823MBfR+RwCfv1Eo57G99bgnJUcuoe3J9ehlLJWsX8=
+github.com/xgfone/go-generics v0.3.0/go.mod h1:8+Wd/5eVql1eKLRXbMuXi5Q3MZkRAFtiV05wAfVuvqU=
 golang.org/x/exp v0.0.0-20230420155350-5d9e357047b1 h1:esPLYTcXPu8wpTcWCNGwSDTodgJwTTFNfeELKb4ewTg=
 golang.org/x/exp v0.0.0-20230420155350-5d9e357047b1/go.mod h1:CxIveKay+FTh1D0yPZemJVgC/95VzuuOLq5Qi4xnoYc=
