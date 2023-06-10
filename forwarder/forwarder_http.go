@@ -54,6 +54,8 @@ func (f *Forwarder) ForwardHTTP(ctx context.Context, w http.ResponseWriter,
 	r *http.Request, reqProcessor processor.Processor) (interface{}, error) {
 	// 1. Create a new request.
 	req := r.Clone(ctx)
+	req.Close = false
+	req.Header.Del("Connection")
 	//req.URL.Host = "" // Dial to the backend http endpoint.
 	req.RequestURI = "" // Pretend to be a client request.
 	if req.URL.Scheme == "" {
