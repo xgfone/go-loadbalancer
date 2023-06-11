@@ -32,7 +32,7 @@ const (
 
 // SetDiscardWriter sets the log writer to discard all log outputs.
 func SetDiscardWriter() {
-	handler := slog.HandlerOptions{}.NewJSONHandler(io.Discard)
+	handler := slog.NewJSONHandler(io.Discard, nil)
 	slog.SetDefault(slog.New(handler))
 }
 
