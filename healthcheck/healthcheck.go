@@ -23,7 +23,6 @@ import (
 
 	"github.com/xgfone/go-atomicvalue"
 	"github.com/xgfone/go-checker"
-	"github.com/xgfone/go-generics/maps"
 	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
@@ -208,7 +207,10 @@ func (hc *HealthChecker) ResetEndpoints(news endpoint.Endpoints, checker Checker
 
 	for id := range hc.epmaps {
 		if !news.Contains(id) {
-			c, ok := maps.Pop(hc.epmaps, id)
+			c, ok := hc.epmaps[id]
+			if ok {
+				delete(hc.epmaps, id)
+			}
 			hc.cleanChecker(id, c, ok)
 		}
 	}
@@ -259,7 +261,10 @@ func (hc *HealthChecker) RemoveEndpoint(epid string) {
 	}
 
 	hc.slock.Lock()
-	c, ok := maps.Pop(hc.epmaps, epid)
+	c, ok := hc.epmaps[epid]
+	if ok {
+		delete(hc.epmaps, epid)
+	}
 	hc.slock.Unlock()
 	hc.cleanChecker(epid, c, ok)
 }

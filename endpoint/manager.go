@@ -15,11 +15,10 @@
 package endpoint
 
 import (
+	"slices"
 	"sort"
 	"sync"
 	"sync/atomic"
-
-	"github.com/xgfone/go-generics/slices"
 )
 
 var _ Discovery = new(Manager)

@@ -29,9 +29,11 @@ func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	resp, err := f.ForwardHTTP(r.Context(), w, r, nil)
 	switch {
 	case err == nil:
-		resp := resp.(*http.Response)
-		defer resp.Body.Close()
-		processor.HandleResponse(w, resp) // Success
+		if resp != nil { // Success
+			resp := resp.(*http.Response)
+			defer resp.Body.Close()
+			processor.HandleResponse(w, resp)
+		}
 
 	case err == loadbalancer.ErrNoAvailableEndpoints:
 		w.WriteHeader(503) // Service Unavailable
@@ -55,6 +57,7 @@ func (f *Forwarder) ForwardHTTP(ctx context.Context, w http.ResponseWriter,
 	// 1. Create a new request.
 	req := r.Clone(ctx)
 	req.Close = false
+	req.URL.User = nil
 	req.Header.Del("Connection")
 	//req.URL.Host = "" // Dial to the backend http endpoint.
 	req.RequestURI = "" // Pretend to be a client request.

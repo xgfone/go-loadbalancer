@@ -52,13 +52,13 @@ func TestLoadBalancer(t *testing.T) {
 	time.Sleep(time.Millisecond * 100)
 
 	ep1 := endpoint.Config{
-		IP:     "127.0.0.1",
+		Host:   "127.0.0.1",
 		Port:   8101,
 		Weight: 1,
 	}.NewEndpoint()
 
 	ep2 := endpoint.Config{
-		IP:     "127.0.0.1",
+		Host:   "127.0.0.1",
 		Port:   8102,
 		Weight: 2,
 	}.NewEndpoint()

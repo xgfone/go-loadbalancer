@@ -1,5 +1,6 @@
 # Go LoadBalancer [![Build Status](https://github.com/xgfone/go-loadbalancer/actions/workflows/go.yml/badge.svg)](https://github.com/xgfone/go-loadbalancer/actions/workflows/go.yml) [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/go-loadbalancer)](https://pkg.go.dev/github.com/xgfone/go-loadbalancer) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/go-loadbalancer/master/LICENSE)
 
+Require Go `1.21+`.
 
 ## Install
 ```shell
@@ -13,10 +14,10 @@ $ go get -u github.com/xgfone/go-loadbalancer
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"net/http"
 
-	"github.com/xgfone/go-binder"
 	"github.com/xgfone/go-loadbalancer/balancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/forwarder"
@@ -24,7 +25,7 @@ import (
 	httpep "github.com/xgfone/go-loadbalancer/http/endpoint"
 )
 
-var listenAddr = flag.String("listen-addr", ":80", "The address that api gateway listens on.")
+var listenAddr = flag.String("listenaddr", ":80", "The address that api gateway listens on.")
 
 func main() {
 	flag.Parse()
@@ -52,14 +53,15 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 			ForwardPolicy string              `json:"forwardPolicy" default:"weight_random"`
 			HealthCheck   healthcheck.Checker `json:"healthCheck"`
 			Servers       []struct {
-				IP     string `json:"ip" validate:"ip"`
+				Host   string `json:"host" validate:"host"`
 				Port   uint16 `json:"port" validate:"ranger(1,65535)"`
 				Weight int    `json:"weight" default:"1" validate:"min(1)"`
 			} `json:"servers"`
 		} `json:"upstream"`
 	}
 
-	if err := binder.BodyDecoder.Decode(&req, r); err != nil {
+	// Notice: here we don't validate whether the values are valid.
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request route paramenter: "+err.Error(), 400)
 		return
 	}
@@ -68,7 +70,7 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 	endpoints := make(endpoint.Endpoints, len(req.Upstream.Servers))
 	for i, server := range req.Upstream.Servers {
 		endpoints[i] = httpep.Config{
-			IP:     server.IP,
+			Host:   server.Host,
 			Port:   server.Port,
 			Weight: server.Weight,
 		}.NewEndpoint()

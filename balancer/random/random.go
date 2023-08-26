@@ -17,11 +17,13 @@ package random
 
 import (
 	"context"
+	"math/rand"
 
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
-	"github.com/xgfone/go-loadbalancer/internal/random"
 )
+
+var random = rand.Intn
 
 // Balancer implements the balancer based on the random.
 type Balancer struct{ balancer }
@@ -42,7 +44,7 @@ func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discove
 	case 1:
 		return eps[0].Serve(c, r)
 	default:
-		return eps[b.random(_len)].Serve(c, r)
+		return eps[random(_len)].Serve(c, r)
 	}
 }
 
@@ -73,7 +75,7 @@ func (b *WeightedBalancer) Forward(c context.Context, r interface{}, sd endpoint
 		total += endpoint.GetWeight(eps[i])
 	}
 
-	pos := b.random(total)
+	pos := random(total)
 	for {
 		var total int
 		for i := 0; i < _len; i++ {
@@ -86,16 +88,14 @@ func (b *WeightedBalancer) Forward(c context.Context, r interface{}, sd endpoint
 	}
 }
 
-type balancer struct {
-	random func(int) int
-	policy string
-}
+type balancer string
 
 // Policy returns the policy of the balancer.
-func (b *balancer) Policy() string { return b.policy }
+func (b balancer) Policy() string { return string(b) }
+
 func newBalancer(policy, _default string) balancer {
 	if policy == "" {
 		policy = _default
 	}
-	return balancer{policy: policy, random: random.NewRandom()}
+	return balancer(policy)
 }

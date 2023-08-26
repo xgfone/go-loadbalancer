@@ -1,10 +1,6 @@
 github.com/xgfone/go-atomicvalue v0.2.0 h1:C/28ARO2Nsx1UymHfpxQRxwNwseSDlsgQgsM1VahV6U=
 github.com/xgfone/go-atomicvalue v0.2.0/go.mod h1:fAKLVfK1snK0JKAFRsKhIhd220Cg9SSEuvOay6MXs88=
-github.com/xgfone/go-checker v0.2.0 h1:Nj0u9ZEaBpgz58GJ+xhTYFPtJVPGXkbcdpFXb+SZVRI=
-github.com/xgfone/go-checker v0.2.0/go.mod h1:HNkJUfk+bHfGLsI5PnnX3dYrS6aD+eMkcQDLjP2iWrU=
-github.com/xgfone/go-defaults v0.6.0 h1:D6Hw6ygvpAAUX6bGqD2yd1qiwbSYGF2FDO6eQKz2h6Y=
-github.com/xgfone/go-defaults v0.6.0/go.mod h1:zwcnD8escc6E5QrCNKRLQddb4/hcUnUOM20kUeki18Y=
-github.com/xgfone/go-generics v0.3.0 h1:f823MBfR+RwCfv1Eo57G99bgnJUcuoe3J9ehlLJWsX8=
-github.com/xgfone/go-generics v0.3.0/go.mod h1:8+Wd/5eVql1eKLRXbMuXi5Q3MZkRAFtiV05wAfVuvqU=
-golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 h1:k/i9J1pBpvlfR+9QsetwPyERsqu1GIbi967PQMq3Ivc=
-golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1/go.mod h1:V1LtkGg67GoY2N1AnLN78QLrzxkLyJw7RJb1gzOOz9w=
+github.com/xgfone/go-checker v0.3.0 h1:6CVy5QsIfCO9NqRpb/f+GwrY7+evBmVeaiSA1qtRBMk=
+github.com/xgfone/go-checker v0.3.0/go.mod h1:HNkJUfk+bHfGLsI5PnnX3dYrS6aD+eMkcQDLjP2iWrU=
+github.com/xgfone/go-defaults v0.8.0 h1:5TZhUz8EK3DI26rBuxWVZXdnivwND4EW6epu746kamM=
+github.com/xgfone/go-defaults v0.8.0/go.mod h1:zwcnD8escc6E5QrCNKRLQddb4/hcUnUOM20kUeki18Y=

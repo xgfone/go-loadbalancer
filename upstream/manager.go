@@ -15,10 +15,10 @@
 package upstream
 
 import (
+	"maps"
 	"sync"
 
 	"github.com/xgfone/go-atomicvalue"
-	"github.com/xgfone/go-generics/maps"
 )
 
 // DefaultManager is the default upstream manager.
@@ -95,8 +95,9 @@ func (m *Manager) AddUpstream(up *Upstream) (ok bool) {
 
 func (m *Manager) delUpstream(name string) *Upstream {
 	m.lock.Lock()
-	up, ok := maps.Pop(m.ups, name)
+	up, ok := m.ups[name]
 	if ok {
+		delete(m.ups, name)
 		m.updateUpstreams()
 	}
 	m.lock.Unlock()

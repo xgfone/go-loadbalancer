@@ -20,12 +20,10 @@ import (
 	"testing"
 
 	"github.com/xgfone/go-loadbalancer/balancer/random"
-	"github.com/xgfone/go-loadbalancer/internal/slog"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
 func BenchmarkLoadBalancer(b *testing.B) {
-	slog.SetDiscardWriter() // Discard log for test.
 	f := NewForwarder("test", random.NewBalancer(""))
 	f.EndpointManager().ResetEndpoints(tests.NewEndpoint("127.0.0.1", 1), tests.NewEndpoint("127.0.0.2", 1))
 

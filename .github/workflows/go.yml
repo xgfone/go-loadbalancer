@@ -5,13 +5,12 @@ env:
   GOPATH: /home/runner/go
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     name: Go ${{ matrix.go }}
     strategy:
       matrix:
         go:
-        - '1.19'
-        - '1.20'
+        - '1.21.x'
     steps:
     - uses: actions/checkout@v3
     - name: Setup Go

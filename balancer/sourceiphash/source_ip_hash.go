@@ -18,6 +18,7 @@ package sourceiphash
 import (
 	"context"
 	"encoding/binary"
+	"math/rand"
 	"net"
 	"net/netip"
 	"strings"
@@ -25,8 +26,9 @@ import (
 	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
-	"github.com/xgfone/go-loadbalancer/internal/random"
 )
+
+var random = rand.Intn
 
 // Balancer implements the balancer based on the source-ip hash.
 type Balancer struct {
@@ -36,7 +38,6 @@ type Balancer struct {
 	GetSourceAddr func(ctx context.Context, req interface{}) (netip.Addr, error)
 
 	policy string
-	random func(int) int
 }
 
 // NewBalancer returns a new balancer based on the source-ip hash
@@ -47,7 +48,7 @@ func NewBalancer(policy string) *Balancer {
 	if policy == "" {
 		policy = "source_ip_hash"
 	}
-	return &Balancer{policy: policy, random: random.NewRandom()}
+	return &Balancer{policy: policy}
 }
 
 // Policy returns the policy of the balancer.
@@ -87,7 +88,7 @@ func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discove
 		value = binary.BigEndian.Uint64(b16[8:16])
 
 	default:
-		value = uint64(b.random(_len))
+		value = uint64(random(_len))
 	}
 
 	return eps[value%uint64(_len)].Serve(c, r)

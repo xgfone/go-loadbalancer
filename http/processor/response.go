@@ -17,8 +17,8 @@ package processor
 import (
 	"io"
 	"net/http"
+	"slices"
 
-	"github.com/xgfone/go-generics/slices"
 	"github.com/xgfone/go-loadbalancer"
 )
 
