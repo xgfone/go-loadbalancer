@@ -32,7 +32,7 @@ func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if resp != nil { // Success
 			resp := resp.(*http.Response)
 			defer resp.Body.Close()
-			processor.HandleResponse(w, resp)
+			processor.HandleResponse(w, resp, nil)
 		}
 
 	case err == loadbalancer.ErrNoAvailableEndpoints:

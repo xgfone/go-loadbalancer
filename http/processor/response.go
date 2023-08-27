@@ -18,6 +18,7 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"sync"
 
 	"github.com/xgfone/go-loadbalancer"
 )
@@ -27,24 +28,20 @@ var DefaultFilterededHeaders = []string{"Host", "Connection"}
 
 // HandleResponse copies the response header and body to w.
 //
-// If filteredHeaders is nil, use DefaultFilterededHeaders instead.
-// If filteredHeaders is empty, that's []string{}, ignore all the headers.
-// Or, only copy the header not in it.
-func HandleResponse(w http.ResponseWriter, resp *http.Response, filteredHeaders ...string) error {
-	if filteredHeaders == nil {
-		filteredHeaders = DefaultFilterededHeaders
-	}
-	if len(filteredHeaders) > 0 {
-		header := w.Header()
-		for k, vs := range resp.Header {
-			switch {
-			case len(vs) == 0:
-			case len(vs) == 1 && vs[0] == "":
-			case slices.Contains(filteredHeaders, k):
-			default:
-				header[k] = vs
-			}
+// cb will be called after copying the response header.
+func HandleResponse(w http.ResponseWriter, resp *http.Response, cb func(http.ResponseWriter)) error {
+	header := w.Header()
+	for k, vs := range resp.Header {
+		switch {
+		case len(vs) == 0:
+		case len(vs) == 1 && vs[0] == "":
+		case slices.Contains(DefaultFilterededHeaders, k):
+		default:
+			header[k] = vs
 		}
+	}
+	if cb != nil {
+		cb(w)
 	}
 	return HandleResponseBody(w, resp)
 }
@@ -52,6 +49,12 @@ func HandleResponse(w http.ResponseWriter, resp *http.Response, filteredHeaders 
 // HandleResponseBody copies the response body, not contain header, to w.
 func HandleResponseBody(w http.ResponseWriter, resp *http.Response) error {
 	w.WriteHeader(resp.StatusCode)
-	_, err := io.CopyBuffer(w, resp.Body, make([]byte, 1024))
+	buf := bspool.Get().(*buffer)
+	_, err := io.CopyBuffer(w, resp.Body, buf.data)
+	bspool.Put(buf)
 	return loadbalancer.NewError(false, err)
 }
+
+var bspool = &sync.Pool{New: func() any { return &buffer{make([]byte, 1024)} }}
+
+type buffer struct{ data []byte }
