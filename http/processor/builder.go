@@ -16,69 +16,58 @@ package processor
 
 import "fmt"
 
-var builders = make(map[string]Builder, 32)
-
 // Builder is used to build a processor by the directive and arguments.
 type Builder func(directive string, args ...interface{}) (Processor, error)
 
-// RegisterBuilder registers the processor builder with the directive.
+// BuilderManager is used to manage a set of the processor builders.
+type BuilderManager struct {
+	builders map[string]Builder
+}
+
+// DefalutBuilderManager is the default global builder manager.
+var DefalutBuilderManager = NewBuilderManager()
+
+// NewBuilderManager returns a new processor builder manager.
+func NewBuilderManager() *BuilderManager {
+	return &BuilderManager{builders: make(map[string]Builder, 32)}
+}
+
+// Reset clears all the registered processor builders.
+func (m *BuilderManager) Reset() { clear(m.builders) }
+
+// Register registers the processor builder with the directive.
 //
 // If the directive has existed, override it.
-func RegisterBuilder(directive string, builder Builder) {
+func (m *BuilderManager) Register(directive string, builder Builder) {
 	if directive == "" {
 		panic("processor directive must not be empty")
 	}
 	if builder == nil {
 		panic("processor builder must not be nil")
 	}
-	builders[directive] = builder
+	m.builders[directive] = builder
 }
 
-// RegisterExtBuilder is the same as RegisterBuilder, but returns an ExtProcessor.
-func RegisterExtBuilder(ptype, directive string, builder Builder) {
-	if ptype == "" {
-		panic("processor type must not be empty")
-	}
-
-	RegisterBuilder(directive, func(directive string, args ...interface{}) (Processor, error) {
-		p, err := builder(directive, args...)
-		if err != nil {
-			return nil, err
-		}
-		desc := fmt.Sprintf("$%s: %v", directive, args)
-		return NewExtProcessor(ptype, desc, p), nil
-	})
-}
-
-// GetBuilder returns the registered processor builder by the directive.
+// Get returns the registered processor builder by the directive.
 //
 // If the directive does not exist, return nil.
-func GetBuilder(directive string) Builder { return builders[directive] }
+func (m *BuilderManager) Get(directive string) Builder { return m.builders[directive] }
 
-// GetAllDirectives returns the directives of all the processor builders.
-func GetAllDirectives() []string {
-	directives := make([]string, 0, len(builders))
-	for directive := range builders {
+// AllDirectives returns the directives of all the processor builders.
+func (m *BuilderManager) AllDirectives() []string {
+	directives := make([]string, 0, len(m.builders))
+	for directive := range m.builders {
 		directives = append(directives, directive)
 	}
 	return directives
 }
 
 // Build is a convenient function to build a new directive for directive.
-func Build(directive string, args ...interface{}) (processor Processor, err error) {
-	if builder := GetBuilder(directive); builder == nil {
+func (m *BuilderManager) Build(directive string, args ...interface{}) (processor Processor, err error) {
+	if builder := m.Get(directive); builder == nil {
 		err = fmt.Errorf("no the processor builder for the directive '%s'", directive)
 	} else if processor, err = builder(directive, args...); err == nil && processor == nil {
 		panic(fmt.Errorf("processor builder for the directive '%s' returns a nil", directive))
-	}
-	return
-}
-
-// Must is equal to Build, but panics if there is an error.
-func Must(directive string, args ...interface{}) (processor Processor) {
-	processor, err := Build(directive, args...)
-	if err != nil {
-		panic(err)
 	}
 	return
 }
