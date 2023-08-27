@@ -40,13 +40,6 @@ type (
 		Process(context.Context, Context) error
 	}
 
-	// ExtProcessor is an extended processor.
-	ExtProcessor interface {
-		String() string
-		Type() string
-		Processor
-	}
-
 	// ProcessorFunc is the processor function.
 	ProcessorFunc func(ctx context.Context, pc Context) error
 
@@ -122,8 +115,8 @@ func Request(f func(*http.Request)) Processor {
 	})
 }
 
-// ResponseHeader is a convenient function to a simple response header processor.
-func ResponseHeader(f func(http.ResponseWriter)) Processor {
+// Response is a convenient function to return a simple response processor.
+func Response(f func(http.ResponseWriter)) Processor {
 	return ProcessorFunc(func(_ context.Context, pc Context) error {
 		f(pc.SrcRes)
 		return nil
@@ -151,42 +144,3 @@ func CompactProcessors(processors ...Processor) Processors {
 	}
 	return _processors
 }
-
-// GetProcessorType returns the type of the processor if it is an ExtProcessor.
-// Or, reutrn "".
-func GetProcessorType(processor Processor) string {
-	for {
-		switch p := processor.(type) {
-		case ExtProcessor:
-			return p.Type()
-		case interface{ Unwrap() Processor }:
-			return GetProcessorType(p.Unwrap())
-		default:
-			return ""
-		}
-	}
-}
-
-// NewExtProcessor returns a new ExtProcessor.
-func NewExtProcessor(ptype, desc string, processor Processor) ExtProcessor {
-	if ptype == "" {
-		panic("ExtProcessor: type must not be empty")
-	}
-	if desc == "" {
-		panic("ExtProcessor: desc must not be empty")
-	}
-	if processor == nil {
-		panic("ExtProcessor: processor must not be nil")
-	}
-	return extProcessor{ptype: ptype, pdesc: desc, Processor: processor}
-}
-
-type extProcessor struct {
-	ptype string
-	pdesc string
-	Processor
-}
-
-func (p extProcessor) String() string    { return p.pdesc }
-func (p extProcessor) Type() string      { return p.ptype }
-func (p extProcessor) Unwrap() Processor { return p.Processor }

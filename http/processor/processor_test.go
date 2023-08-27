@@ -27,14 +27,3 @@ func TestCompactProcessors(t *testing.T) {
 		t.Errorf("expect %d processor, but got %d", 1, _len)
 	}
 }
-
-func TestGetProcessorType(t *testing.T) {
-	f := func(p ExtProcessor) Processor { return p }
-
-	ps := CompactProcessors(f(NewExtProcessor("t1", "t1", ProcessorFunc(nothing))))
-	for _, p := range ps {
-		if pt := GetProcessorType(p); pt != "t1" {
-			t.Errorf("expect processor type '%s', but got '%s'", "t1", pt)
-		}
-	}
-}
