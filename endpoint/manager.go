@@ -45,13 +45,13 @@ func (m *Manager) Number() int { return len(m.OnEndpoints()) }
 // which implements the interface Discovery#Endpoints,
 func (m *Manager) Endpoints() Endpoints { return m.OnEndpoints() }
 
-// OnEndpoints returns all the online endpoints.
+// OnEndpoints returns all the online endpoints, which is read-only.
 func (m *Manager) OnEndpoints() Endpoints { return m.oneps.Load() }
 
-// OffEndpoints returns all the offline endpoints.
+// OffEndpoints returns all the offline endpoints, which is read-only.
 func (m *Manager) OffEndpoints() Endpoints { return m.offeps.Load() }
 
-// AllEndpoints returns all the endpoints.
+// AllEndpoints returns all the endpoints, which is read-only.
 func (m *Manager) AllEndpoints() Endpoints { return m.alleps.Load() }
 
 // SetEndpointStatus sets the status of the endpoint.
