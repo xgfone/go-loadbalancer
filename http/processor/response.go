@@ -52,7 +52,7 @@ func HandleResponseBody(w http.ResponseWriter, resp *http.Response) error {
 	buf := bspool.Get().(*buffer)
 	_, err := io.CopyBuffer(w, resp.Body, buf.data)
 	bspool.Put(buf)
-	return loadbalancer.NewError(false, err)
+	return loadbalancer.NewRetryError(false, err)
 }
 
 var bspool = &sync.Pool{New: func() any { return &buffer{make([]byte, 1024)} }}

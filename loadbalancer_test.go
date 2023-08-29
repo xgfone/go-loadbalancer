@@ -18,11 +18,11 @@ package loadbalancer
 import "testing"
 
 func TestNewError(t *testing.T) {
-	if err := NewError(true, nil); err != nil {
+	if err := NewRetryError(true, nil); err != nil {
 		t.Errorf("expect nil, but got %v", err)
 	}
 
-	switch err := NewError(true, ErrNoAvailableEndpoints).(type) {
+	switch err := NewRetryError(true, ErrNoAvailableEndpoints).(type) {
 	case retryError:
 		if !err.Retry() {
 			t.Errorf("expect retry is true, but got false")

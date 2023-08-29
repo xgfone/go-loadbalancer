@@ -20,41 +20,18 @@ import "errors"
 // ErrNoAvailableEndpoints is used to represents no available endpoints.
 var ErrNoAvailableEndpoints = errors.New("no available endpoints")
 
-// ForwardError represents a forward error.
-type ForwardError struct{ Err error }
-
-// NewForwardError returns a new forward error.
-func NewForwardError(err error) ForwardError { return ForwardError{err} }
-
-// Error implements the error interface.
-func (e ForwardError) Error() string { return e.Err.Error() }
-
-// Unwrap returns the inner wrapped error.
-func (e ForwardError) Unwrap() error { return e.Err }
-
-// ErrIsForward reports whether the error is a forward error.
-func ErrIsForward(err error) bool {
-	_, ok := err.(ForwardError)
-	return ok
-}
-
-// RetryError represents a no-retry error.
+// RetryError represents a retry error.
 type RetryError interface {
 	Retry() bool
 	error
 }
 
-// NewRetryError returns a new retry error.
-func NewRetryError(retry bool, err error) RetryError {
-	return retryError{retry: retry, err: err}
-}
-
-// NewError is the same as NewRetryError, but returns nil instead if err is nil.
-func NewError(retry bool, err error) error {
-	if err != nil {
-		err = NewRetryError(retry, err)
+// NewRetryError returns a new retry error, but returns nil instead if err is nil.
+func NewRetryError(retry bool, err error) error {
+	if err == nil {
+		return nil
 	}
-	return err
+	return retryError{retry: retry, err: err}
 }
 
 type retryError struct {
@@ -62,11 +39,6 @@ type retryError struct {
 	err   error
 }
 
-func (e retryError) Unwrap() error { return e.err }
 func (e retryError) Retry() bool   { return e.retry }
-func (e retryError) Error() string {
-	if e.err == nil {
-		return "<nil>"
-	}
-	return e.err.Error()
-}
+func (e retryError) Error() string { return e.err.Error() }
+func (e retryError) Unwrap() error { return e.err }
