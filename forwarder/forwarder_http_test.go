@@ -141,7 +141,7 @@ func TestLoadBalancer(t *testing.T) {
 		t.Errorf("invalid the endpoint2 online status: online=%v, ok=%v", ep.Status().IsOnline(), ok)
 	}
 
-	eps := forwarder.AllEndpoints()
+	eps := forwarder.EndpointManager().AllEndpoints()
 	if len(eps) != 2 {
 		t.Errorf("expect %d endpoints, but got %d", 2, len(eps))
 	}

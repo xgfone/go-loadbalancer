@@ -124,7 +124,7 @@ func (f *Forwarder) Serve(ctx context.Context, req interface{}) (interface{}, er
 		ed = f.epmanager
 	}
 
-	if ed.OnlineNum() <= 0 {
+	if ed.Number() <= 0 {
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	}
 
@@ -170,26 +170,14 @@ func (f *Forwarder) RemoveEndpoint(epid string) {
 
 // ------------------------------------------------------------------------ //
 
-// OnlineNum implements the interfce endpoint.Discovery#OnlineNum
+// Number implements the interfce endpoint.Discovery#Number
 // to return the number of the online endpoints.
-func (f *Forwarder) OnlineNum() int {
-	return f.Discovery().OnlineNum()
+func (f *Forwarder) Number() int {
+	return f.Discovery().Number()
 }
 
-// OnEndpoints implements the inerface endpoint.Discovery#OnEndpoints
+// Endpoints implements the inerface endpoint.Discovery#Endpoints
 // to only return all the online endpoints.
-func (f *Forwarder) OnEndpoints() endpoint.Endpoints {
-	return f.Discovery().OnEndpoints()
-}
-
-// OffEndpoints implements the inerface endpoint.Discovery#OffEndpoints
-// to only return all the offline endpoints.
-func (f *Forwarder) OffEndpoints() endpoint.Endpoints {
-	return f.Discovery().OffEndpoints()
-}
-
-// AllEndpoints implements the inerface endpoint.Discovery#OnEndpoints
-// to return all the endpoints.
-func (f *Forwarder) AllEndpoints() endpoint.Endpoints {
-	return f.Discovery().AllEndpoints()
+func (f *Forwarder) Endpoints() endpoint.Endpoints {
+	return f.Discovery().Endpoints()
 }

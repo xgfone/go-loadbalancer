@@ -53,7 +53,7 @@ func (c *epchecker) SetChecker(config Checker) { c.config.Store(config); c.SetCo
 
 func (c *epchecker) Unwrap() endpoint.Endpoint        { return c.Endpoint }
 func (c *epchecker) GetEndpoint() endpoint.Endpoint   { return c.Endpoint }
-func (c *epchecker) SetEndpoint(ep endpoint.Endpoint) { c.Endpoint.Update(ep.Info()) }
+func (c *epchecker) SetEndpoint(ep endpoint.Endpoint) { _ = c.Endpoint.Update(ep.Info()) }
 
 // Updater is used to update the endpoint status.
 type Updater interface {

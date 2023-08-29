@@ -16,9 +16,9 @@ package endpoint
 
 import (
 	"slices"
-	"sort"
 	"sync"
-	"sync/atomic"
+
+	"github.com/xgfone/go-atomicvalue"
 )
 
 var _ Discovery = new(Manager)
@@ -28,39 +28,31 @@ type Manager struct {
 	lock sync.RWMutex
 	eps  map[string]Endpoint
 
-	oneps  atomic.Value
-	offeps atomic.Value
-	alleps atomic.Value
+	oneps  atomicvalue.Value[Endpoints]
+	offeps atomicvalue.Value[Endpoints]
+	alleps atomicvalue.Value[Endpoints]
 }
 
 // NewManager returns a new endpoint manager.
 func NewManager() *Manager {
-	m := &Manager{eps: make(map[string]Endpoint, 8)}
-	m.alleps.Store(Endpoints{})
-	m.offeps.Store(Endpoints{})
-	m.oneps.Store(Endpoints{})
-	return m
+	return &Manager{eps: make(map[string]Endpoint, 8)}
 }
 
-// OnlineNum implements the interface Discovery#OnlineNum.
-func (m *Manager) OnlineNum() int {
-	return len(m.OnEndpoints())
-}
+// Number implements the interface Discovery#Number.
+func (m *Manager) Number() int { return len(m.OnEndpoints()) }
 
-// OnEndpoints implements the interface Discovery#OnEndpoints.
-func (m *Manager) OnEndpoints() Endpoints {
-	return m.oneps.Load().(Endpoints)
-}
+// Endpoints is the alias of OnEndpoints,
+// which implements the interface Discovery#Endpoints,
+func (m *Manager) Endpoints() Endpoints { return m.OnEndpoints() }
 
-// OffEndpoints implements the interface Discovery#OffEndpoints.
-func (m *Manager) OffEndpoints() Endpoints {
-	return m.offeps.Load().(Endpoints)
-}
+// OnEndpoints returns all the online endpoints.
+func (m *Manager) OnEndpoints() Endpoints { return m.oneps.Load() }
 
-// AllEndpoints implements the interface Discovery#AllEndpoints.
-func (m *Manager) AllEndpoints() Endpoints {
-	return m.alleps.Load().(Endpoints)
-}
+// OffEndpoints returns all the offline endpoints.
+func (m *Manager) OffEndpoints() Endpoints { return m.offeps.Load() }
+
+// AllEndpoints returns all the endpoints.
+func (m *Manager) AllEndpoints() Endpoints { return m.alleps.Load() }
 
 // SetEndpointStatus sets the status of the endpoint.
 func (m *Manager) SetEndpointStatus(epid string, status Status) {
@@ -106,7 +98,7 @@ func (m *Manager) ResetEndpoints(news ...Endpoint) {
 
 	for _, ep := range news {
 		if _ep, ok := m.eps[ep.ID()]; ok { // Update
-			_ep.Update(ep.Info())
+			_ = _ep.Update(ep.Info())
 		} else { // Add
 			m.eps[ep.ID()] = ep
 		}
@@ -133,7 +125,7 @@ func (m *Manager) UpsertEndpoints(eps ...Endpoint) {
 
 	for _, ep := range eps {
 		if _ep, ok := m.eps[ep.ID()]; ok {
-			_ep.Update(ep.Info())
+			_ = _ep.Update(ep.Info())
 		} else {
 			m.eps[ep.ID()] = ep
 		}
@@ -188,14 +180,14 @@ func (m *Manager) updateEndpointsStatus() {
 	swapEndpoints(&m.offeps, offeps) // For offline
 }
 
-func swapEndpoints(dsteps *atomic.Value, neweps Endpoints) {
+func swapEndpoints(dsteps *atomicvalue.Value[Endpoints], neweps Endpoints) {
 	if len(neweps) == 0 {
-		oldeps := dsteps.Swap(Endpoints{}).(Endpoints)
+		oldeps := dsteps.Swap(nil)
 		Release(oldeps)
 		Release(neweps)
 	} else {
-		sort.Stable(neweps)
-		oldeps := dsteps.Swap(neweps).(Endpoints)
+		Sort(neweps)
+		oldeps := dsteps.Swap(neweps)
 		Release(oldeps)
 	}
 }

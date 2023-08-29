@@ -14,13 +14,16 @@
 
 package tests
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestNewEndpoint(t *testing.T) {
 	ep := NewEndpoint("1.2.3.4", 1)
 	ep.current = 0
-	ep.Serve(nil, nil)
-	ep.Serve(nil, nil)
+	_, _ = ep.Serve(context.Background(), nil)
+	_, _ = ep.Serve(context.Background(), nil)
 
 	state := ep.State()
 	if state.Total != 2 {

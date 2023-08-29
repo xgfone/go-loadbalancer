@@ -71,13 +71,13 @@ func newServer(host string, conf Config) *server {
 
 func (s *server) String() string { return s.host }
 
-func (s *server) getConf() Config        { return s.conf.Load().(Config) }
-func (s *server) setConf(c Config) error { s.conf.Store(c); return nil }
+func (s *server) getConf() Config  { return s.conf.Load().(Config) }
+func (s *server) setConf(c Config) { s.conf.Store(c) }
 
 func (s *server) ID() string                    { return s.host }
 func (s *server) Type() string                  { return "http" }
 func (s *server) Info() interface{}             { return s.getConf() }
-func (s *server) Update(info interface{}) error { return s.setConf(info.(Config)) }
+func (s *server) Update(info interface{}) error { s.setConf(info.(Config)); return nil }
 func (s *server) State() endpoint.State         { return s.state.Clone() }
 
 func (s *server) Weight() int {

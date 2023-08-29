@@ -47,7 +47,7 @@ func BenchBalancer(b *testing.B, forwarder forwarder) {
 	b.ReportAllocs()
 	b.RunParallel(func(p *testing.PB) {
 		for p.Next() {
-			forwarder.Forward(context.Background(), req, eps)
+			_, _ = forwarder.Forward(context.Background(), req, eps)
 		}
 	})
 }

@@ -15,7 +15,6 @@
 package endpoint_test
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/xgfone/go-loadbalancer/endpoint"
@@ -31,7 +30,7 @@ func TestEndpoints(t *testing.T) {
 	ep6 := tests.NewEndpoint("192.168.1.6", 2)
 
 	eps := endpoint.Endpoints{ep1, ep2, ep3, ep4, ep5, ep6}
-	sort.Stable(eps)
+	endpoint.Sort(eps)
 
 	expects := []string{
 		"192.168.1.1", "192.168.1.2",

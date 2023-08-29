@@ -45,7 +45,7 @@ func NewRetry(balancer balancer.Balancer, interval time.Duration, maxNum int) Re
 
 // Forward overrides the Forward method.
 func (b Retry) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (resp interface{}, err error) {
-	eps := sd.OnEndpoints()
+	eps := sd.Endpoints()
 	_len := len(eps)
 	switch _len {
 	case 0:

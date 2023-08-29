@@ -41,14 +41,14 @@ func TestSourceIPHash(t *testing.T) {
 	req3.RemoteAddr = "192.168.0.2"
 
 	balancer := NewBalancer("")
-	balancer.Forward(context.Background(), req1, eps)
-	balancer.Forward(context.Background(), req1, eps)
-	balancer.Forward(context.Background(), req1, eps)
-	balancer.Forward(context.Background(), req1, eps)
-	balancer.Forward(context.Background(), req1, eps)
-	balancer.Forward(context.Background(), req1, eps)
-	balancer.Forward(context.Background(), req2, eps)
-	balancer.Forward(context.Background(), req3, eps)
+	_, _ = balancer.Forward(context.Background(), req1, eps)
+	_, _ = balancer.Forward(context.Background(), req1, eps)
+	_, _ = balancer.Forward(context.Background(), req1, eps)
+	_, _ = balancer.Forward(context.Background(), req1, eps)
+	_, _ = balancer.Forward(context.Background(), req1, eps)
+	_, _ = balancer.Forward(context.Background(), req1, eps)
+	_, _ = balancer.Forward(context.Background(), req2, eps)
+	_, _ = balancer.Forward(context.Background(), req3, eps)
 
 	if total := ep1.State().Total; total != 6 {
 		t.Errorf("expect %d endpoint1, but got %d", 6, total)

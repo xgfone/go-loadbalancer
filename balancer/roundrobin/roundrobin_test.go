@@ -38,7 +38,7 @@ func TestWeightedRoundRobin(t *testing.T) {
 
 	balancer := NewWeightedBalancer("")
 	for i := 0; i < 18; i++ {
-		balancer.Forward(context.Background(), nil, eps)
+		_, _ = balancer.Forward(context.Background(), nil, eps)
 	}
 
 	if state := ep1.State(); state.Total != 3 {

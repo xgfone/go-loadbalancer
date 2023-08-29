@@ -34,7 +34,7 @@ func TestLeastConn(t *testing.T) {
 
 	balancer := NewBalancer("")
 	for i := 0; i < 10; i++ {
-		balancer.Forward(context.Background(), nil, eps)
+		_, _ = balancer.Forward(context.Background(), nil, eps)
 	}
 
 	if state := ep1.State(); state.Total != 10 {
