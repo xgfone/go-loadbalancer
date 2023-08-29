@@ -41,12 +41,12 @@ func TestLoadBalancer(t *testing.T) {
 
 	go func() {
 		server := http.Server{Addr: "127.0.0.1:8101", Handler: testHandler("8101")}
-		server.ListenAndServe()
+		_ = server.ListenAndServe()
 	}()
 
 	go func() {
 		server := http.Server{Addr: "127.0.0.1:8102", Handler: testHandler("8102")}
-		server.ListenAndServe()
+		_ = server.ListenAndServe()
 	}()
 
 	time.Sleep(time.Millisecond * 100)

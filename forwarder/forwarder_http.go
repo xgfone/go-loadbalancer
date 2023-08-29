@@ -16,13 +16,24 @@ package forwarder
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/http/processor"
-	"github.com/xgfone/go-loadbalancer/internal/nets"
 )
+
+type timeoutError interface {
+	Timeout() bool // Is the error a timeout?
+	error
+}
+
+// IsTimeout reports whether the error is timeout.
+func isTimeout(err error) bool {
+	var timeoutErr timeoutError
+	return errors.As(err, &timeoutErr) && timeoutErr.Timeout()
+}
 
 // ServeHTTP implements the interface http.Handler.
 func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -32,13 +43,13 @@ func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if resp != nil { // Success
 			resp := resp.(*http.Response)
 			defer resp.Body.Close()
-			processor.HandleResponse(w, resp, nil)
+			_ = processor.HandleResponse(w, resp, nil)
 		}
 
 	case err == loadbalancer.ErrNoAvailableEndpoints:
 		w.WriteHeader(503) // Service Unavailable
 
-	case nets.IsTimeout(err):
+	case isTimeout(err):
 		w.WriteHeader(504) // Gateway Timeout
 
 	default:
@@ -46,7 +57,7 @@ func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.ServeHTTP(w, nil)
 		} else {
 			w.WriteHeader(502) // Bad Gateway
-			io.WriteString(w, err.Error())
+			_, _ = io.WriteString(w, err.Error())
 		}
 	}
 }
