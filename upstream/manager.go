@@ -157,12 +157,8 @@ func (m *Manager) ResetUpstreams(upstreams map[string][]Option) {
 	m.updateUpstreams()
 }
 
-// GetUpstreams returns all the upstreams.
-func (m *Manager) GetUpstreams() map[string]*Upstream {
-	return maps.Clone(m.upm.Load())
-}
+// GetUpstreams returns all the upstreams, which is read-only.
+func (m *Manager) GetUpstreams() map[string]*Upstream { return m.upm.Load() }
 
 // GetUpstream returns the upstream by the name.
-func (m *Manager) GetUpstream(name string) *Upstream {
-	return m.upm.Load()[name]
-}
+func (m *Manager) GetUpstream(name string) *Upstream { return m.upm.Load()[name] }
