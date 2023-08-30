@@ -17,45 +17,55 @@ package endpoint
 import "sync"
 
 var (
-	eppool4   = sync.Pool{New: func() any { return make(Endpoints, 0, 4) }}
-	eppool8   = sync.Pool{New: func() any { return make(Endpoints, 0, 8) }}
-	eppool16  = sync.Pool{New: func() any { return make(Endpoints, 0, 16) }}
-	eppool32  = sync.Pool{New: func() any { return make(Endpoints, 0, 32) }}
-	eppool64  = sync.Pool{New: func() any { return make(Endpoints, 0, 64) }}
-	eppool128 = sync.Pool{New: func() any { return make(Endpoints, 0, 128) }}
+	eppool4   = sync.Pool{New: func() any { return &epswrapper{make(Endpoints, 0, 4)} }}
+	eppool8   = sync.Pool{New: func() any { return &epswrapper{make(Endpoints, 0, 8)} }}
+	eppool16  = sync.Pool{New: func() any { return &epswrapper{make(Endpoints, 0, 16)} }}
+	eppool32  = sync.Pool{New: func() any { return &epswrapper{make(Endpoints, 0, 32)} }}
+	eppool64  = sync.Pool{New: func() any { return &epswrapper{make(Endpoints, 0, 64)} }}
+	eppool128 = sync.Pool{New: func() any { return &epswrapper{make(Endpoints, 0, 128)} }}
 )
 
+type epswrapper struct{ Endpoints }
+
+func (w *epswrapper) Unwrap() Endpoints {
+	if w == nil {
+		return nil
+	}
+	return w.Endpoints
+}
+
 // Acquire acquires a preallocated zero-length endpoints from the pool.
-func Acquire(expectedMaxCap int) Endpoints {
+func Acquire(expectedMaxCap int) *epswrapper {
 	switch {
 	case expectedMaxCap <= 4:
-		return eppool4.Get().(Endpoints)
+		return eppool4.Get().(*epswrapper)
 
 	case expectedMaxCap <= 8:
-		return eppool8.Get().(Endpoints)
+		return eppool8.Get().(*epswrapper)
 
 	case expectedMaxCap <= 16:
-		return eppool16.Get().(Endpoints)
+		return eppool16.Get().(*epswrapper)
 
 	case expectedMaxCap <= 32:
-		return eppool32.Get().(Endpoints)
+		return eppool32.Get().(*epswrapper)
 
 	case expectedMaxCap <= 64:
-		return eppool64.Get().(Endpoints)
+		return eppool64.Get().(*epswrapper)
 
 	default:
-		return eppool128.Get().(Endpoints)
+		return eppool128.Get().(*epswrapper)
 	}
 }
 
 // Release releases the endpoints back into the pool.
-func Release(eps Endpoints) {
-	for i, _len := 0, len(eps); i < _len; i++ {
-		eps[i] = nil
+func Release(eps *epswrapper) {
+	if eps == nil || len(eps.Endpoints) == 0 {
+		return
 	}
 
-	eps = eps[:0]
-	cap := cap(eps)
+	clear(eps.Endpoints)
+	eps.Endpoints = eps.Endpoints[:0]
+	cap := cap(eps.Endpoints)
 	switch {
 	case cap < 8:
 		eppool4.Put(eps)

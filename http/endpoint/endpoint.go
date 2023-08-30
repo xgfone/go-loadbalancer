@@ -75,7 +75,6 @@ func (s *server) getConf() Config  { return s.conf.Load().(Config) }
 func (s *server) setConf(c Config) { s.conf.Store(c) }
 
 func (s *server) ID() string                    { return s.host }
-func (s *server) Type() string                  { return "http" }
 func (s *server) Info() interface{}             { return s.getConf() }
 func (s *server) Update(info interface{}) error { s.setConf(info.(Config)); return nil }
 func (s *server) State() endpoint.State         { return s.state.Clone() }

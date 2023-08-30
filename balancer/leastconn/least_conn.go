@@ -47,11 +47,11 @@ func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discove
 	case 1:
 		return eps[0].Serve(c, r)
 	default:
-		endpoints := endpoint.Acquire(len(eps))
-		endpoints = append(endpoints, eps...)
-		sort.Stable(leastConnEndpoints(endpoints))
-		ep := endpoints[0]
-		endpoint.Release(endpoints)
+		w := endpoint.Acquire(len(eps))
+		w.Endpoints = append(w.Endpoints, eps...)
+		sort.Stable(leastConnEndpoints(w.Endpoints))
+		ep := w.Endpoints[0]
+		endpoint.Release(w)
 		return ep.Serve(c, r)
 	}
 }

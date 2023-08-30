@@ -34,7 +34,6 @@ type TestEndpoint struct {
 func (ep *TestEndpoint) String() string                          { return ep.ip }
 func (ep *TestEndpoint) Weight() int                             { return ep.weight }
 func (ep *TestEndpoint) ID() string                              { return ep.ip }
-func (ep *TestEndpoint) Type() string                            { return "" }
 func (ep *TestEndpoint) Info() interface{}                       { return nil }
 func (ep *TestEndpoint) Update(info interface{}) error           { return nil }
 func (ep *TestEndpoint) Check(context.Context, interface{}) bool { return true }
@@ -45,7 +44,7 @@ func (ep *TestEndpoint) State() endpoint.State {
 	}
 	return state
 }
-func (ep *TestEndpoint) Serve(c context.Context, r interface{}) (interface{}, error) {
+func (ep *TestEndpoint) Serve(context.Context, interface{}) (interface{}, error) {
 	ep.state.IncSuccess()
 	ep.state.Inc()
 	ep.state.Dec()

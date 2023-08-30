@@ -28,9 +28,9 @@ type Manager struct {
 	lock sync.RWMutex
 	eps  map[string]Endpoint
 
-	oneps  atomicvalue.Value[Endpoints]
-	offeps atomicvalue.Value[Endpoints]
-	alleps atomicvalue.Value[Endpoints]
+	oneps  atomicvalue.Value[*epswrapper]
+	offeps atomicvalue.Value[*epswrapper]
+	alleps atomicvalue.Value[*epswrapper]
 }
 
 // NewManager returns a new endpoint manager.
@@ -46,13 +46,13 @@ func (m *Manager) Number() int { return len(m.OnEndpoints()) }
 func (m *Manager) Endpoints() Endpoints { return m.OnEndpoints() }
 
 // OnEndpoints returns all the online endpoints, which is read-only.
-func (m *Manager) OnEndpoints() Endpoints { return m.oneps.Load() }
+func (m *Manager) OnEndpoints() Endpoints { return m.oneps.Load().Unwrap() }
 
 // OffEndpoints returns all the offline endpoints, which is read-only.
-func (m *Manager) OffEndpoints() Endpoints { return m.offeps.Load() }
+func (m *Manager) OffEndpoints() Endpoints { return m.offeps.Load().Unwrap() }
 
 // AllEndpoints returns all the endpoints, which is read-only.
-func (m *Manager) AllEndpoints() Endpoints { return m.alleps.Load() }
+func (m *Manager) AllEndpoints() Endpoints { return m.alleps.Load().Unwrap() }
 
 // SetEndpointStatus sets the status of the endpoint.
 func (m *Manager) SetEndpointStatus(epid string, status Status) {
@@ -123,17 +123,37 @@ func (m *Manager) UpsertEndpoints(eps ...Endpoint) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	var new bool
 	for _, ep := range eps {
 		if _ep, ok := m.eps[ep.ID()]; ok {
 			_ = _ep.Update(ep.Info())
 		} else {
+			new = true
 			m.eps[ep.ID()] = ep
 		}
 	}
-	m.updateEndpoints()
+	if new {
+		m.updateEndpoints()
+	}
 }
 
-// RemoveEndpoint removes the endpoint by the id.
+// UpsertEndpoint adds or updates an endpoint,
+// which also implements the interface healthcheck.Updater#UpsertEndpoint.
+func (m *Manager) UpsertEndpoint(ep Endpoint) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	id := ep.ID()
+	if _ep, ok := m.eps[id]; ok {
+		_ = _ep.Update(ep.Info())
+	} else {
+		m.eps[id] = ep
+		m.updateEndpoints()
+	}
+}
+
+// RemoveEndpoint removes the endpoint by the id,
+// which also implements the interface healthcheck.Updater#RemoveEndpoint.
 func (m *Manager) RemoveEndpoint(epid string) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -144,17 +164,28 @@ func (m *Manager) RemoveEndpoint(epid string) {
 	}
 }
 
+// SetEndpointOnline is the same as SetEndpointStatus,
+// but use the bool online instead of StatusOnline or StatusOffline,
+// which also implements the interface healthcheck.Updater#SetEndpointOnline.
+func (m *Manager) SetEndpointOnline(epid string, online bool) {
+	if online {
+		m.SetEndpointStatus(epid, StatusOnline)
+	} else {
+		m.SetEndpointStatus(epid, StatusOffline)
+	}
+}
+
 func (m *Manager) updateEndpoints() {
 	oneps := Acquire(len(m.eps))
 	alleps := Acquire(len(m.eps))
 	offeps := Acquire(0)
 	for _, ep := range m.eps {
-		alleps = append(alleps, ep)
+		alleps.Endpoints = append(alleps.Endpoints, ep)
 		switch ep.Status() {
 		case StatusOnline:
-			oneps = append(oneps, ep)
+			oneps.Endpoints = append(oneps.Endpoints, ep)
 		case StatusOffline:
-			offeps = append(offeps, ep)
+			offeps.Endpoints = append(offeps.Endpoints, ep)
 		}
 	}
 
@@ -170,9 +201,9 @@ func (m *Manager) updateEndpointsStatus() {
 	for _, ep := range m.AllEndpoints() {
 		switch ep.Status() {
 		case StatusOnline:
-			oneps = append(oneps, ep)
+			oneps.Endpoints = append(oneps.Endpoints, ep)
 		case StatusOffline:
-			offeps = append(offeps, ep)
+			offeps.Endpoints = append(offeps.Endpoints, ep)
 		}
 	}
 
@@ -180,13 +211,13 @@ func (m *Manager) updateEndpointsStatus() {
 	swapEndpoints(&m.offeps, offeps) // For offline
 }
 
-func swapEndpoints(dsteps *atomicvalue.Value[Endpoints], neweps Endpoints) {
-	if len(neweps) == 0 {
+func swapEndpoints(dsteps *atomicvalue.Value[*epswrapper], neweps *epswrapper) {
+	if len(neweps.Endpoints) == 0 {
 		oldeps := dsteps.Swap(nil)
 		Release(oldeps)
 		Release(neweps)
 	} else {
-		Sort(neweps)
+		Sort(neweps.Endpoints)
 		oldeps := dsteps.Swap(neweps)
 		Release(oldeps)
 	}

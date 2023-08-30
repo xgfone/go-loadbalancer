@@ -23,7 +23,6 @@ import (
 type Endpoint interface {
 	// Static information
 	ID() string
-	Type() string
 	Info() interface{}
 
 	// Dynamic information
@@ -45,6 +44,11 @@ type WeightedEndpoint interface {
 	Weight() int
 
 	Endpoint
+}
+
+// Unwrapper is used to unwrap the inner endpoint.
+type Unwrapper interface {
+	Unwrap() Endpoint
 }
 
 // Discovery is used to discover the endpoints.
@@ -104,6 +108,10 @@ func (eps Endpoints) Contains(endpointID string) bool {
 
 // Sort sorts the endpoints by the ASC order.
 func Sort(eps Endpoints) {
+	if len(eps) == 0 {
+		return
+	}
+
 	sort.SliceStable(eps, func(i, j int) bool {
 		iw, jw := GetWeight(eps[i]), GetWeight(eps[j])
 		if iw < jw {
@@ -123,7 +131,10 @@ func Sort(eps Endpoints) {
 func GetWeight(ep Endpoint) int {
 	switch s := ep.(type) {
 	case WeightedEndpoint:
-		return s.Weight()
+		if weight := s.Weight(); weight > 0 {
+			return weight
+		}
+		return 1
 
 	case interface{ Unwrap() Endpoint }:
 		return GetWeight(s.Unwrap())

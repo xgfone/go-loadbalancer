@@ -55,6 +55,8 @@ func (c *epchecker) Unwrap() endpoint.Endpoint        { return c.Endpoint }
 func (c *epchecker) GetEndpoint() endpoint.Endpoint   { return c.Endpoint }
 func (c *epchecker) SetEndpoint(ep endpoint.Endpoint) { _ = c.Endpoint.Update(ep.Info()) }
 
+var _ Updater = new(endpoint.Manager)
+
 // Updater is used to update the endpoint status.
 type Updater interface {
 	UpsertEndpoint(endpoint.Endpoint)
