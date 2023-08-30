@@ -97,10 +97,19 @@ func (f *Forwarder) GetEndpointDiscovery() (ed endpoint.Discovery) {
 	return f.discovery.Load()
 }
 
+// SetEndpointDiscovery sets the endpoint discovery to discover the endpoints.
+//
+// If sd is equal to nil, it will cancel the endpoint discovery.
+// Or, use the endpoint discovery instead of the direct endpoints.
+func (f *Forwarder) SetEndpointDiscovery(sd endpoint.Discovery) {
+	f.discovery.Store(sd)
+	// f.ResetEndpoints() // We need to clear all the endpoints??
+}
+
 // SwapEndpointDiscovery sets the endpoint discovery to discover the endpoints,
 // and returns the old one.
 //
-// If sd is equal to nil, it will cancel the endpoint discovery.
+// If new is equal to nil, it will cancel the endpoint discovery.
 // Or, use the endpoint discovery instead of the direct endpoints.
 func (f *Forwarder) SwapEndpointDiscovery(new endpoint.Discovery) (old endpoint.Discovery) {
 	old = f.discovery.Swap(new)
