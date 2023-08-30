@@ -38,8 +38,9 @@ func NewManager(initcap int) *Manager {
 	return &Manager{eps: make(map[string]Endpoint, initcap)}
 }
 
-// Number implements the interface Discovery#Number.
-func (m *Manager) Number() int { return len(m.OnEndpoints()) }
+// Len implements the interface Discovery#Len,
+// which returns the length of the online endpoints.
+func (m *Manager) Len() int { return len(m.OnEndpoints()) }
 
 // Endpoints is the alias of OnEndpoints,
 // which implements the interface Discovery#Endpoints,

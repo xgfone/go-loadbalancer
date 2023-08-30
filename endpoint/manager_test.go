@@ -30,22 +30,22 @@ func TestManager(t *testing.T) {
 		tests.NewEndpoint("1.2.3.6", 1),
 	)
 
-	if num := m.Number(); num != 3 {
+	if num := m.Len(); num != 3 {
 		t.Errorf("expect %d, but got %d", 3, num)
 	}
 
 	m.SetEndpointStatus("1.2.3.4", endpoint.StatusOffline)
-	if num := m.Number(); num != 2 {
+	if num := m.Len(); num != 2 {
 		t.Errorf("expect %d, but got %d: %v", 2, num, m.OnEndpoints())
 	}
 
 	m.SetEndpointStatus("1.2.3.5", endpoint.StatusOffline)
-	if num := m.Number(); num != 1 {
+	if num := m.Len(); num != 1 {
 		t.Errorf("expect %d, but got %d", 1, num)
 	}
 
 	m.SetEndpointStatus("1.2.3.6", endpoint.StatusOffline)
-	if num := m.Number(); num != 0 {
+	if num := m.Len(); num != 0 {
 		t.Errorf("expect %d, but got %d", 0, num)
 	}
 

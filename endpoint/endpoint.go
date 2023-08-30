@@ -54,7 +54,7 @@ type Unwrapper interface {
 // Discovery is used to discover the endpoints.
 type Discovery interface {
 	Endpoints() Endpoints
-	Number() int
+	Len() int
 }
 
 var _ Discovery = Endpoints(nil)
@@ -62,39 +62,16 @@ var _ Discovery = Endpoints(nil)
 // Endpoints represents a group of the endpoints.
 type Endpoints []Endpoint
 
-// Number implements the interface Discovery#Number
-// to return the number of all the online endpoints.
-func (eps Endpoints) Number() (n int) {
-	for _, s := range eps {
-		if s.Status().IsOnline() {
-			n++
-		}
-	}
-	return len(eps.Endpoints())
-}
+// Len implements the interface Discovery#Len,
+// which return the number of all the endpoints.
+//
+// NOTICE: it should be just used for test.
+func (eps Endpoints) Len() (n int) { return len(eps.Endpoints()) }
 
-// Endpoints implements the interface Discovery#Endpoints
-// to return all the online endpoints.
-func (eps Endpoints) Endpoints() Endpoints {
-	var offline bool
-	for _, s := range eps {
-		if s.Status().IsOffline() {
-			offline = true
-			break
-		}
-	}
-	if !offline {
-		return eps
-	}
-
-	endpoints := make(Endpoints, 0, len(eps))
-	for _, s := range eps {
-		if s.Status().IsOnline() {
-			endpoints = append(endpoints, s)
-		}
-	}
-	return endpoints
-}
+// Endpoints implements the interface Discovery#Endpoints, which returns itself.
+//
+// NOTICE: it should be just used for test.
+func (eps Endpoints) Endpoints() Endpoints { return eps }
 
 // Contains reports whether the endpoints contains the endpoint indicated by the id.
 func (eps Endpoints) Contains(endpointID string) bool {
