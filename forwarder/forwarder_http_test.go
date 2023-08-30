@@ -25,7 +25,9 @@ import (
 
 	"github.com/xgfone/go-loadbalancer/balancer/retry"
 	"github.com/xgfone/go-loadbalancer/balancer/roundrobin"
-	"github.com/xgfone/go-loadbalancer/http/endpoint"
+	"github.com/xgfone/go-loadbalancer/endpoint"
+	"github.com/xgfone/go-loadbalancer/endpoint/extep"
+	httpep "github.com/xgfone/go-loadbalancer/http/endpoint"
 )
 
 func testHandler(key string) http.Handler {
@@ -51,19 +53,19 @@ func TestLoadBalancer(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 100)
 
-	ep1 := endpoint.Config{
+	ep1 := extep.NewStateEndpoint(httpep.Config{
 		Host:   "127.0.0.1",
 		Port:   8101,
 		Weight: 1,
-	}.NewEndpoint()
+	}.NewEndpoint())
 
-	ep2 := endpoint.Config{
+	ep2 := extep.NewStateEndpoint(httpep.Config{
 		Host:   "127.0.0.1",
 		Port:   8102,
 		Weight: 2,
-	}.NewEndpoint()
+	}.NewEndpoint())
 
-	if url := ep1.Info().(endpoint.Config).ID(); url != "127.0.0.1:8101" {
+	if url := ep1.Info().(httpep.Config).ID(); url != "127.0.0.1:8101" {
 		t.Errorf("expect '%s', but got '%s'", "127.0.0.1:8101", url)
 	}
 	if ok := ep1.Check(context.Background(), nil); !ok {
@@ -99,20 +101,20 @@ func TestLoadBalancer(t *testing.T) {
 
 	state := ep1.State()
 	if state.Total != 2 {
-		t.Errorf("expect %d total requests, but got %d", 4, state.Total)
+		t.Errorf("expect %d total requests, but got %d", 2, state.Total)
 	}
-	if state.Success != 2 {
-		t.Errorf("expect %d success requests, but got %d", 4, state.Total)
+	if state.Failure != 0 {
+		t.Errorf("expect %d failure requests, but got %d", 0, state.Failure)
 	}
 
 	/// ------------------------------------------------------------------ ///
 
 	forwarder.SetEndpointOnline(ep1.ID(), false)
-	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep1.ID()); !ok || ep.Status().IsOnline() {
-		t.Errorf("invalid the endpoint1 online status: online=%v, ok=%v", ep.Status().IsOnline(), ok)
+	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep1.ID()); !ok || endpoint.IsOnline(ep) {
+		t.Errorf("invalid the endpoint1 online status: online=%v, ok=%v", endpoint.IsOnline(ep), ok)
 	}
-	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep2.ID()); !ok || !ep.Status().IsOnline() {
-		t.Errorf("invalid the endpoint2 online status: online=%v, ok=%v", ep.Status().IsOnline(), ok)
+	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep2.ID()); !ok || !endpoint.IsOnline(ep) {
+		t.Errorf("invalid the endpoint2 online status: online=%v, ok=%v", endpoint.IsOnline(ep), ok)
 	}
 
 	rec.Body.Reset()
@@ -137,8 +139,8 @@ func TestLoadBalancer(t *testing.T) {
 	/// ------------------------------------------------------------------ ///
 
 	forwarder.SetEndpointOnline(ep2.ID(), false)
-	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep2.ID()); !ok || ep.Status().IsOnline() {
-		t.Errorf("invalid the endpoint2 online status: online=%v, ok=%v", ep.Status().IsOnline(), ok)
+	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep2.ID()); !ok || endpoint.IsOnline(ep) {
+		t.Errorf("invalid the endpoint2 online status: online=%v, ok=%v", endpoint.IsOnline(ep), ok)
 	}
 
 	eps := forwarder.EndpointManager().AllEndpoints()
@@ -153,7 +155,7 @@ func TestLoadBalancer(t *testing.T) {
 			t.Errorf("unknown endpoint id '%s'", id)
 		}
 
-		if ep.Status().IsOnline() {
+		if endpoint.IsOnline(ep) {
 			t.Errorf("expect endpoint '%s' online is false, but got true", id)
 		}
 	}

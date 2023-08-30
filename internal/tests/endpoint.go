@@ -24,32 +24,19 @@ var _ endpoint.Endpoint = new(TestEndpoint)
 
 type TestEndpoint struct {
 	ip      string
-	state   endpoint.State
 	weight  int
 	current uint64
 
 	endpoint.StatusManager
 }
 
-func (ep *TestEndpoint) String() string                          { return ep.ip }
-func (ep *TestEndpoint) Weight() int                             { return ep.weight }
-func (ep *TestEndpoint) ID() string                              { return ep.ip }
-func (ep *TestEndpoint) Info() interface{}                       { return nil }
-func (ep *TestEndpoint) Update(info interface{}) error           { return nil }
-func (ep *TestEndpoint) Check(context.Context, interface{}) bool { return true }
-func (ep *TestEndpoint) State() endpoint.State {
-	state := ep.state.Clone()
-	if ep.current > 0 {
-		state.Current = ep.current
-	}
-	return state
-}
-func (ep *TestEndpoint) Serve(context.Context, interface{}) (interface{}, error) {
-	ep.state.IncSuccess()
-	ep.state.Inc()
-	ep.state.Dec()
-	return nil, nil
-}
+func (ep *TestEndpoint) String() string                                          { return ep.ip }
+func (ep *TestEndpoint) Weight() int                                             { return ep.weight }
+func (ep *TestEndpoint) ID() string                                              { return ep.ip }
+func (ep *TestEndpoint) Info() interface{}                                       { return nil }
+func (ep *TestEndpoint) Update(interface{}) error                                { return nil }
+func (ep *TestEndpoint) Check(context.Context, interface{}) bool                 { return true }
+func (ep *TestEndpoint) Serve(context.Context, interface{}) (interface{}, error) { return nil, nil }
 
 // NewEndpoint returns a new endpoint to do the test.
 func NewEndpoint(ip string, weight int) *TestEndpoint {

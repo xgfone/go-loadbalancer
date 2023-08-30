@@ -21,17 +21,15 @@ import (
 
 // Endpoint represents an backend endpoint.
 type Endpoint interface {
-	// Static information
 	ID() string
-	Info() interface{}
 
-	// Dynamic information
-	State() State
-	Status() Status
-	SetStatus(Status)
+	Info() interface{}
+	Update(info interface{}) error
+
+	Status() string
+	SetStatus(string)
 
 	// Handler
-	Update(info interface{}) error
 	Serve(ctx context.Context, req interface{}) (interface{}, error)
 	Check(ctx context.Context, req interface{}) (ok bool)
 }

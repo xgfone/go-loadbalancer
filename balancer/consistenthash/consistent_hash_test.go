@@ -22,15 +22,16 @@ import (
 	"testing"
 
 	"github.com/xgfone/go-loadbalancer/endpoint"
+	"github.com/xgfone/go-loadbalancer/endpoint/extep"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
 func TestBalancer(t *testing.T) {
 	eps := endpoint.Endpoints{
-		tests.NewEndpoint("1.2.3.4:8000", 1),
-		tests.NewEndpoint("1.2.3.4:8080", 1),
-		tests.NewEndpoint("5.6.7.8:8000", 1),
-		tests.NewEndpoint("5.6.7.8:8080", 1),
+		extep.NewStateEndpoint(tests.NewEndpoint("1.2.3.4:8000", 1)),
+		extep.NewStateEndpoint(tests.NewEndpoint("1.2.3.4:8080", 1)),
+		extep.NewStateEndpoint(tests.NewEndpoint("5.6.7.8:8000", 1)),
+		extep.NewStateEndpoint(tests.NewEndpoint("5.6.7.8:8080", 1)),
 	}
 
 	balancer := NewBalancer("chash_ip", func(req interface{}) int {
@@ -52,7 +53,7 @@ func TestBalancer(t *testing.T) {
 	var num int
 	counts := make([]uint64, len(eps))
 	for i := 0; i < len(eps); i++ {
-		total := eps[i].State().Total
+		total := extep.GetState(eps[i]).Total
 		counts[i] = total
 		if total > 0 {
 			num++

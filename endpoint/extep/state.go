@@ -12,24 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package endpoint
+package extep
 
-import "sync/atomic"
+import (
+	"context"
+	"sync/atomic"
+
+	"github.com/xgfone/go-loadbalancer/endpoint"
+)
 
 // State is the runtime state of an endpoint, which can be inlined
 // into other struct.
 type State struct {
 	Total   uint64 // The total number to handle all the requests.
-	Success uint64 // The total number to handle the requests successfully.
+	Failure uint64 // The total number to fail to handle the requests.
 	Current uint64 // The number of the requests that are being handled.
 
 	// For the extra runtime information.
 	Extra interface{} `json:",omitempty" xml:",omitempty"`
 }
 
-// IncSuccess increases the success state.
-func (rs *State) IncSuccess() {
-	atomic.AddUint64(&rs.Success, 1)
+// IncFailure increases the failure state.
+func (rs *State) IncFailure() {
+	atomic.AddUint64(&rs.Failure, 1)
 }
 
 // Inc increases the total and current state.
@@ -56,7 +61,48 @@ func (rs *State) Clone() State {
 	return State{
 		Extra:   extra,
 		Total:   atomic.LoadUint64(&rs.Total),
-		Success: atomic.LoadUint64(&rs.Success),
+		Failure: atomic.LoadUint64(&rs.Failure),
 		Current: atomic.LoadUint64(&rs.Current),
 	}
+}
+
+// GetState returns the state of the endpoint.
+//
+// Return ZERO if ep has not implemented the interface StateEndpoint.
+func GetState(ep endpoint.Endpoint) State {
+	switch s := ep.(type) {
+	case StateEndpoint:
+		return s.State()
+	case endpoint.Unwrapper:
+		return GetState(s.Unwrap())
+	default:
+		return State{}
+	}
+}
+
+// StateEndpoint is an extended endpoint supporting the state.
+type StateEndpoint interface {
+	endpoint.Endpoint
+	State() State
+}
+
+// NewStateEndpoint returns a new state endpoint.
+func NewStateEndpoint(ep endpoint.Endpoint) StateEndpoint {
+	return &stateep{Endpoint: ep}
+}
+
+type stateep struct {
+	endpoint.Endpoint
+	state State
+}
+
+func (s *stateep) State() State              { return s.state.Clone() }
+func (s *stateep) Unwrap() endpoint.Endpoint { return s.Endpoint }
+func (s *stateep) Serve(c context.Context, r interface{}) (rp interface{}, e error) {
+	s.state.Inc()
+	defer s.state.Dec()
+	if rp, e = s.Endpoint.Serve(c, r); e != nil {
+		s.state.IncFailure()
+	}
+	return
 }

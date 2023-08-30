@@ -316,7 +316,7 @@ func (si EndpointInfo) Unwrap() endpoint.Endpoint {
 }
 
 // Status overrides the interface method endpoint.Endpoint#Status.
-func (si EndpointInfo) Status() endpoint.Status {
+func (si EndpointInfo) Status() string {
 	if si.Online {
 		return endpoint.StatusOnline
 	}

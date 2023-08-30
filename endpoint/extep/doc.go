@@ -12,8 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tests
-
-import "testing"
-
-func TestNewEndpoint(t *testing.T) {}
+// Package extep provides some extended functions of the endpoint.
+package extep

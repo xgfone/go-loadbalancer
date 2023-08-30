@@ -18,13 +18,20 @@ package leastconn
 import (
 	"context"
 	"sort"
+	"sync"
 
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
+	"github.com/xgfone/go-loadbalancer/endpoint/extep"
 )
 
 // Balancer implements the balancer based on the least number of the connection.
-type Balancer struct{ policy string }
+//
+// NOTICE: the endpoint must have implemented the interface extep.StateEndpoint.
+type Balancer struct {
+	policy string
+	lock   sync.Mutex
+}
 
 // NewBalancer returns a new balancer based on the random with the policy name.
 //
@@ -47,13 +54,19 @@ func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discove
 	case 1:
 		return eps[0].Serve(c, r)
 	default:
-		w := endpoint.Acquire(len(eps))
-		w.Endpoints = append(w.Endpoints, eps...)
-		sort.Stable(leastConnEndpoints(w.Endpoints))
-		ep := w.Endpoints[0]
-		endpoint.Release(w)
-		return ep.Serve(c, r)
+		return b.selectEndpoint(eps).Serve(c, r)
 	}
+}
+
+func (b *Balancer) selectEndpoint(eps endpoint.Endpoints) endpoint.Endpoint {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	w := endpoint.Acquire(len(eps))
+	w.Endpoints = append(w.Endpoints, eps...)
+	sort.Stable(leastConnEndpoints(w.Endpoints))
+	ep := w.Endpoints[0]
+	endpoint.Release(w)
+	return ep
 }
 
 type leastConnEndpoints endpoint.Endpoints
@@ -61,5 +74,5 @@ type leastConnEndpoints endpoint.Endpoints
 func (eps leastConnEndpoints) Len() int      { return len(eps) }
 func (eps leastConnEndpoints) Swap(i, j int) { eps[i], eps[j] = eps[j], eps[i] }
 func (eps leastConnEndpoints) Less(i, j int) bool {
-	return eps[i].State().Current < eps[j].State().Current
+	return extep.GetState(eps[i]).Current < extep.GetState(eps[j]).Current
 }

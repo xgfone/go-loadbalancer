@@ -18,46 +18,31 @@ import "github.com/xgfone/go-atomicvalue"
 
 // Pre-define some endpoint statuses.
 const (
-	StatusOnline  Status = "on"
-	StatusOffline Status = "off"
+	StatusOnline  = "on"
+	StatusOffline = "off"
 )
 
-// Status represents the endpoint status.
-type Status string
+// IsOnline reports whether the status of the endpoint is online or not.
+func IsOnline(ep Endpoint) bool { return ep != nil && ep.Status() == StatusOnline }
 
-// IsOnline reports whether the endpoint status is online.
-func (s Status) IsOnline() bool { return s == "on" }
-
-// IsOffline reports whether the endpoint status is offline.
-func (s Status) IsOffline() bool { return s == "off" }
+// IsOffline reports whether the status of the endpoint is offline or not.
+func IsOffline(ep Endpoint) bool { return ep != nil && ep.Status() == StatusOffline }
 
 // StatusManager is used to manage the status of the endpoint thread-safely
 // which can be inlined into other struct.
-type StatusManager struct {
-	value atomicvalue.Value[Status]
-}
+type StatusManager struct{ value atomicvalue.Value[string] }
 
 // Get returns the current status.
-func (s *StatusManager) Get() Status {
-	return s.value.Load()
-}
+func (s *StatusManager) Get() string { return s.value.Load() }
 
 // Set resets the current status to new.
-func (s *StatusManager) Set(new Status) {
-	s.value.Store(new)
-}
+func (s *StatusManager) Set(new string) { s.value.Store(new) }
 
 // Update is the same as Set, but reports whether the status is changed.
-func (s *StatusManager) Update(new Status) bool {
-	return s.value.CompareAndSwap(s.Get(), new)
-}
+func (s *StatusManager) Update(new string) bool { return s.value.CompareAndSwap(s.Get(), new) }
 
 // Status is equal to Get, but used to implement the interface Endpoint#Status.
-func (s *StatusManager) Status() Status {
-	return s.value.Load()
-}
+func (s *StatusManager) Status() string { return s.value.Load() }
 
 // SetStatus is equal to Set, but used implement the interface Endpoint#SetStatus.
-func (s *StatusManager) SetStatus(new Status) {
-	s.value.Store(new)
-}
+func (s *StatusManager) SetStatus(new string) { s.value.Store(new) }

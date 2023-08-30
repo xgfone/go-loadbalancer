@@ -56,7 +56,7 @@ func (m *Manager) OffEndpoints() Endpoints { return m.offeps.Load().Unwrap() }
 func (m *Manager) AllEndpoints() Endpoints { return m.alleps.Load().Unwrap() }
 
 // SetEndpointStatus sets the status of the endpoint.
-func (m *Manager) SetEndpointStatus(epid string, status Status) {
+func (m *Manager) SetEndpointStatus(epid string, status string) {
 	if ep, ok := m.GetEndpoint(epid); ok {
 		ep.SetStatus(status)
 
@@ -67,7 +67,7 @@ func (m *Manager) SetEndpointStatus(epid string, status Status) {
 }
 
 // SetEndpointStatuses sets the statuses of a group of endpoints.
-func (m *Manager) SetEndpointStatuses(epid2statuses map[string]Status) {
+func (m *Manager) SetEndpointStatuses(epid2statuses map[string]string) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 

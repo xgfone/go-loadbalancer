@@ -55,9 +55,8 @@ func (c Config) NewEndpoint() endpoint.WeightedEndpoint {
 // ------------------------------------------------------------------------- //
 
 type server struct {
-	host  string
-	conf  atomic.Value
-	state endpoint.State
+	host string
+	conf atomic.Value
 	endpoint.StatusManager
 }
 
@@ -77,7 +76,6 @@ func (s *server) setConf(c Config) { s.conf.Store(c) }
 func (s *server) ID() string                    { return s.host }
 func (s *server) Info() interface{}             { return s.getConf() }
 func (s *server) Update(info interface{}) error { s.setConf(info.(Config)); return nil }
-func (s *server) State() endpoint.State         { return s.state.Clone() }
 
 func (s *server) Weight() int {
 	if conf := s.getConf(); conf.Weight > 0 {
@@ -87,16 +85,9 @@ func (s *server) Weight() int {
 }
 
 func (s *server) Serve(ctx context.Context, req interface{}) (interface{}, error) {
-	s.state.Inc()
-	defer s.state.Dec()
-
 	_req := req.(*http.Request)
 	_req.URL.Host = s.host
-	resp, err := http.DefaultClient.Do(_req)
-	if err == nil {
-		s.state.IncSuccess()
-	}
-	return resp, err
+	return http.DefaultClient.Do(_req)
 }
 
 func (s *server) Check(ctx context.Context, req interface{}) (ok bool) {
