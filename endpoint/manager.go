@@ -34,8 +34,8 @@ type Manager struct {
 }
 
 // NewManager returns a new endpoint manager.
-func NewManager() *Manager {
-	return &Manager{eps: make(map[string]Endpoint, 8)}
+func NewManager(initcap int) *Manager {
+	return &Manager{eps: make(map[string]Endpoint, initcap)}
 }
 
 // Number implements the interface Discovery#Number.

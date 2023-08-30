@@ -22,7 +22,7 @@ import (
 )
 
 func TestManager(t *testing.T) {
-	m := endpoint.NewManager()
+	m := endpoint.NewManager(4)
 
 	m.UpsertEndpoints(
 		tests.NewEndpoint("1.2.3.4", 1),

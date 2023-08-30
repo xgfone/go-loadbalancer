@@ -50,7 +50,7 @@ func NewForwarder(name string, balancer balancer.Balancer) *Forwarder {
 	return &Forwarder{
 		name:      name,
 		balancer:  atomicvalue.NewValue(balancer),
-		epmanager: endpoint.NewManager(),
+		epmanager: endpoint.NewManager(0),
 	}
 }
 
