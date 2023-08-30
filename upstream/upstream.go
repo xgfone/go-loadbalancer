@@ -27,9 +27,36 @@ import (
 // Option is used to configure the upstream.
 type Option func(*Upstream)
 
+// SetBalancer returns an upstream option to set the balancer.
+// which is the encapsulation of UpdateForwarder.
+func SetBalancer(balancer balancer.Balancer) Option {
+	if balancer == nil {
+		panic("Upstream: balancer must not be nil")
+	}
+	return func(u *Upstream) { u.forwarder.SwapBalancer(balancer) }
+}
+
+// SetTimeout returns an upstream option to set the forwarding timeout,
+// which is the encapsulation of UpdateForwarder.
+func SetTimeout(timeout time.Duration) Option {
+	if timeout < 0 {
+		panic("Upstream: timeout must not be negative")
+	}
+	return func(u *Upstream) { u.forwarder.SetTimeout(timeout) }
+}
+
+// SetDiscovery sets the endpoint discovery,
+// which is the encapsulation of UpdateForwarder.
+func SetDiscovery(discovery endpoint.Discovery) Option {
+	if discovery == nil {
+		panic("Upstream: the endpoint discovery must not be nil")
+	}
+	return func(u *Upstream) { u.forwarder.SwapEndpointDiscovery(discovery) }
+}
+
 // SetContextData returns an upstream option to set the context data.
 func SetContextData(contextData interface{}) Option {
-	return func(u *Upstream) { u.context.Store(contextData) }
+	return func(u *Upstream) { u.SetContextData(contextData) }
 }
 
 // SetLazyOption returns an upstream option to decide the final option
@@ -44,27 +71,9 @@ func SetLazyOption(f func(*Upstream) Option) Option {
 	}
 }
 
-// SetBalancer returns an upstream option to set the balancer.
-func SetBalancer(balancer balancer.Balancer) Option {
-	if balancer == nil {
-		panic("Upstream: balancer must not be nil")
-	}
-	return func(u *Upstream) { u.forwarder.SwapBalancer(balancer) }
-}
-
-func SetTimeout(timeout time.Duration) Option {
-	if timeout < 0 {
-		panic("Upstream: timeout must not be negative")
-	}
-	return func(u *Upstream) { u.forwarder.SetTimeout(timeout) }
-}
-
-// SetDiscovery sets the endpoint discovery.
-func SetDiscovery(discovery endpoint.Discovery) Option {
-	if discovery == nil {
-		panic("Upstream: the endpoint discovery must not be nil")
-	}
-	return func(u *Upstream) { u.forwarder.SwapEndpointDiscovery(discovery) }
+// UpdateForwarder returns an upstream option to update the forwarder.
+func UpdateForwarder(f func(*forwarder.Forwarder)) Option {
+	return func(u *Upstream) { f(u.forwarder) }
 }
 
 // Upstream represents an upstream to manage the backend endpoints.
@@ -110,6 +119,11 @@ func (up *Upstream) Options() []Option {
 		SetBalancer(up.forwarder.GetBalancer()),
 		SetContextData(up.ContextData()),
 	}
+}
+
+// SetContextData sets the context data.
+func (up *Upstream) SetContextData(contextData interface{}) {
+	up.context.Store(contextData)
 }
 
 // Update updates the upstream with the options.
