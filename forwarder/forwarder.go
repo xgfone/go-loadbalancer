@@ -65,8 +65,18 @@ func (f *Forwarder) GetBalancer() balancer.Balancer {
 	return f.balancer.Load()
 }
 
+func (f *Forwarder) SetBalancer(b balancer.Balancer) {
+	if b == nil {
+		panic("Forwarder.SetBalancer: balancer must not be nil")
+	}
+	f.balancer.Store(b)
+}
+
 // SwapBalancer swaps the old balancer with the new.
 func (f *Forwarder) SwapBalancer(new balancer.Balancer) (old balancer.Balancer) {
+	if new == nil {
+		panic("Forwarder.SetBalancer: balancer must not be nil")
+	}
 	return f.balancer.Swap(new)
 }
 
