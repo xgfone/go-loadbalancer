@@ -18,117 +18,161 @@ package healthcheck
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/xgfone/go-atomicvalue"
 	"github.com/xgfone/go-checker"
-	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
 // DefaultHealthChecker is the default global health checker.
-var DefaultHealthChecker = NewHealthChecker()
+var DefaultHealthChecker = NewHealthChecker("default")
 
-type epchecker struct {
-	endpoint.Endpoint
+// DefaultConfig is the default configuration of the checker.
+var DefaultConfig = Config{Failure: 2, Timeout: time.Second, Interval: time.Second * 10}
+
+type _checker struct {
+	id string
+	hc *HealthChecker
 	*checker.Checker
-
-	config atomicvalue.Value[Checker]
-	hcheck *HealthChecker
 }
 
-func newEndpointChecker(hc *HealthChecker, ep endpoint.Endpoint, config Checker) *epchecker {
-	epc := &epchecker{Endpoint: ep, hcheck: hc}
-	epc.Checker = checker.NewChecker(ep.ID(), epc, hc.setOnline)
-	epc.SetChecker(config)
-	return epc
+func newChecker(hc *HealthChecker, id string) *_checker {
+	c := &_checker{id: id, hc: hc}
+
+	config := hc.cconfig.Load().config
+	config.Delay = delay(config.Interval)
+
+	c.Checker = checker.NewChecker(id, c, hc.setOnline)
+	c.Checker.SetJitter(jitter)
+	c.Checker.SetConfig(config)
+	return c
 }
 
-func (c *epchecker) Check(ctx context.Context) bool {
-	return c.hcheck.checkEndpoint(ctx, c.Endpoint, c.GetChecker().Req)
+func (c *_checker) Online() bool                   { return c.Ok() }
+func (c *_checker) Check(ctx context.Context) bool { return c.hc.check(ctx, c.id) }
+
+func jitter(d time.Duration) time.Duration {
+	return d + time.Duration(rand.Float64()*float64(d)*0.1)
 }
 
-func (c *epchecker) GetChecker() Checker       { return c.config.Load() }
-func (c *epchecker) SetChecker(config Checker) { c.config.Store(config); c.SetConfig(config.Config) }
-
-func (c *epchecker) Unwrap() endpoint.Endpoint        { return c.Endpoint }
-func (c *epchecker) GetEndpoint() endpoint.Endpoint   { return c.Endpoint }
-func (c *epchecker) SetEndpoint(ep endpoint.Endpoint) { _ = c.Endpoint.Update(ep.Info()) }
-
-var _ Updater = new(endpoint.Manager)
-
-// Updater is used to update the endpoint status.
-type Updater interface {
-	UpsertEndpoint(endpoint.Endpoint)
-	RemoveEndpoint(epid string)
-	SetEndpointOnline(epid string, online bool)
+func delay(d time.Duration) time.Duration {
+	if d = time.Duration(rand.Float64() * float64(d) * 0.5); d < time.Millisecond*10 {
+		d = 0
+	}
+	return d
 }
 
-// Checker is used to check the endpoint.
-type Checker struct {
-	Config checker.Config
-	Req    interface{}
+// Config is the checker confgiuration.
+type Config struct {
+	Failure  int           // The failure number to be changed to unhealth.
+	Timeout  time.Duration // The timeout duration to check the target.
+	Interval time.Duration // The interval duration between twice checkings.
 }
 
-// HealthChecker is a health checker to check whether a set of endpoints
-// are healthy.
-//
-// Notice: if there are lots of endpoints to be checked, you maybe need
-// an external checker.
+func (c Config) cconfig() cconfig {
+	if c.Failure <= 0 {
+		c.Failure = 2
+	}
+	if c.Timeout < 0 {
+		c.Timeout = 0
+	}
+	if c.Interval < time.Second {
+		c.Interval = time.Second * 10
+	}
+
+	return cconfig{
+		Config: c,
+		config: checker.Config{
+			Failure:  c.Failure,
+			Timeout:  c.Timeout,
+			Interval: c.Interval,
+		},
+	}
+}
+
+type cconfig struct {
+	config checker.Config
+	Config
+}
+
+// HealthChecker is a health checker to check whether a set of targets are healthy.
 type HealthChecker struct {
-	slock    sync.RWMutex
-	epmaps   map[string]*epchecker
-	cancel   context.CancelFunc
-	context  context.Context
-	updaters sync.Map
+	name string
 
-	epcheck atomicvalue.Value[func(context.Context, endpoint.Endpoint, interface{}) bool]
+	lock    sync.RWMutex
+	maps    map[string]*_checker
+	cancel  context.CancelFunc
+	context context.Context
+
+	updater atomicvalue.Value[func(string, bool)]
+	checker atomicvalue.Value[func(context.Context, string) bool]
+	cconfig atomicvalue.Value[cconfig]
 }
 
 // NewHealthChecker returns a new health checker.
-func NewHealthChecker() *HealthChecker {
-	return &HealthChecker{epmaps: make(map[string]*epchecker, 16)}
-}
-
-func (hc *HealthChecker) setOnline(epid string, online bool) {
-	hc.updaters.Range(func(_, value interface{}) bool {
-		value.(Updater).SetEndpointOnline(epid, online)
-		return true
-	})
-}
-
-func (hc *HealthChecker) checkEndpoint(ctx context.Context, ep endpoint.Endpoint, req interface{}) bool {
-	if check := hc.epcheck.Load(); check != nil {
-		return check(ctx, ep, req)
+func NewHealthChecker(name string) *HealthChecker {
+	return &HealthChecker{
+		name:    name,
+		maps:    make(map[string]*_checker, 16),
+		cconfig: atomicvalue.NewValue(DefaultConfig.cconfig()),
 	}
-	return ep.Check(ctx, req)
 }
 
-// SetEndpointCheck set the check function to intercept the healthcheck of the endpoint.
-//
-// f may be nil, which is equal to call the Check method of Endpoint directly.
-func (hc *HealthChecker) SetEndpointCheck(f func(context.Context, endpoint.Endpoint, interface{}) bool) {
-	hc.epcheck.Store(f)
-}
-
-// Stop stops the health checker.
-func (hc *HealthChecker) Stop() {
-	hc.slock.Lock()
-	defer hc.slock.Unlock()
-	if hc.cancel != nil {
-		hc.cancel()
-		hc.cancel = nil
-		hc.context = nil
+func (hc *HealthChecker) setOnline(id string, online bool) {
+	if cb := hc.updater.Load(); cb != nil {
+		cb(id, online)
+	} else {
+		slog.Warn("HealthChecker: not set the status callback function",
+			"name", hc.name, "id", id, "online", online)
 	}
+}
+
+func (hc *HealthChecker) check(ctx context.Context, id string) bool {
+	if check := hc.checker.Load(); check != nil {
+		return check(ctx, id)
+	}
+	slog.Warn("HealthChecker: not set the check function", "name", hc.name, "id", id)
+	return false
+}
+
+// OnChanged sets the callback function when the status is changed.
+func (hc *HealthChecker) OnChanged(cb func(id string, online bool)) {
+	hc.updater.Store(cb)
+}
+
+// SetChecker set the check function to intercept the health checking.  TODO:
+func (hc *HealthChecker) SetChecker(f func(ctx context.Context, id string) bool) {
+	hc.checker.Store(f)
+}
+
+// SetConfig sets the unified configuration of the checker.
+func (hc *HealthChecker) SetConfig(c Config) {
+	hc.lock.RLock()
+	defer hc.lock.RUnlock()
+
+	cconfig := c.cconfig()
+	hc.cconfig.Store(cconfig)
+	for _, c := range hc.maps {
+		c.SetConfig(cconfig.config)
+	}
+}
+
+// Config returns the unified configuration of the checker.
+func (hc *HealthChecker) Config() Config {
+	return hc.cconfig.Load().Config
 }
 
 // Start starts the health checker.
 func (hc *HealthChecker) Start() {
-	hc.slock.Lock()
-	defer hc.slock.Unlock()
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+
 	if hc.cancel == nil {
 		hc.context, hc.cancel = context.WithCancel(context.Background())
-		for _, c := range hc.epmaps {
+		for _, c := range hc.maps {
 			go c.Start(hc.context)
 		}
 	} else {
@@ -136,220 +180,118 @@ func (hc *HealthChecker) Start() {
 	}
 }
 
-// AddUpdater adds the healthcheck updater with the name.
-func (hc *HealthChecker) AddUpdater(name string, updater Updater) (err error) {
-	if name == "" {
-		panic("HealthChecker: the name is empty")
-	} else if updater == nil {
-		panic("HealthChecker: the updater is nil")
+// Stop stops the health checker.
+func (hc *HealthChecker) Stop() {
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+	if hc.cancel != nil {
+		hc.cancel()
+		hc.cancel = nil
+		hc.context = nil
 	}
-
-	if _, loaded := hc.updaters.LoadOrStore(name, updater); loaded {
-		err = fmt.Errorf("the healthcheck updater named '%s' has been added", name)
-	} else {
-		hc.slock.RLock()
-		defer hc.slock.RUnlock()
-		for id, c := range hc.epmaps {
-			updater.UpsertEndpoint(c.GetEndpoint())
-			updater.SetEndpointOnline(id, c.Ok())
-		}
-	}
-	return
 }
 
-// DelUpdater deletes the healthcheck updater by the name.
-func (hc *HealthChecker) DelUpdater(name string) {
-	if name == "" {
-		panic("the healthcheck name is empty")
-	}
-	hc.updaters.Delete(name)
-}
-
-// GetUpdater returns the healthcheck updater by the name.
+// AddTarget adds a checked target.
 //
-// Return nil if the healthcheck updater does not exist.
-func (hc *HealthChecker) GetUpdater(name string) Updater {
-	if name == "" {
-		panic("the healthcheck name is empty")
-	}
-
-	if value, ok := hc.updaters.Load(name); ok {
-		return value.(Updater)
-	}
-	return nil
+// If exist, do nothing.
+func (hc *HealthChecker) AddTarget(id string) {
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+	hc.addTarget(id)
 }
 
-// GetUpdaters returns all the healthcheck updaters.
-func (hc *HealthChecker) GetUpdaters() map[string]Updater {
-	updaters := make(map[string]Updater, 32)
-	hc.updaters.Range(func(key, value interface{}) bool {
-		updaters[key.(string)] = value.(Updater)
-		return true
-	})
-	return updaters
-}
-
-// ResetChecker resets the checker of all the endpoints.
-func (hc *HealthChecker) ResetChecker(checker Checker) {
-	hc.slock.Lock()
-	defer hc.slock.Unlock()
-	for _, c := range hc.epmaps {
-		c.SetChecker(checker)
+// AddTargets adds a set of the checked targets.
+//
+// If a certain target has exists, do nothing for it.
+func (hc *HealthChecker) AddTargets(ids ...string) {
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+	for _, id := range ids {
+		hc.addTarget(id)
 	}
 }
 
-// ResetEndpoints resets all the endpoints to the news.
-func (hc *HealthChecker) ResetEndpoints(news endpoint.Endpoints, checker Checker) {
-	hc.slock.Lock()
-	defer hc.slock.Unlock()
-
-	for _, ep := range news {
-		hc.upsertEndpoint(ep, checker)
-	}
-
-	for id := range hc.epmaps {
-		if !news.Contains(id) {
-			c, ok := hc.epmaps[id]
-			if ok {
-				delete(hc.epmaps, id)
-			}
-			hc.cleanChecker(id, c, ok)
-		}
-	}
-}
-
-// UpsertEndpoints adds or updates a set of the endpoints with the same healthcheck config.
-func (hc *HealthChecker) UpsertEndpoints(eps endpoint.Endpoints, checker Checker) {
-	hc.slock.Lock()
-	defer hc.slock.Unlock()
-	for _, ep := range eps {
-		hc.upsertEndpoint(ep, checker)
-	}
-}
-
-// UpsertEndpoint adds or updates the endpoint with the healthcheck config.
-func (hc *HealthChecker) UpsertEndpoint(ep endpoint.Endpoint, checker Checker) {
-	hc.slock.Lock()
-	defer hc.slock.Unlock()
-	hc.upsertEndpoint(ep, checker)
-}
-
-func (hc *HealthChecker) upsertEndpoint(ep endpoint.Endpoint, checker Checker) {
-	id := ep.ID()
-	c, ok := hc.epmaps[id]
-	if ok {
-		c.SetEndpoint(ep)
-		c.SetChecker(checker)
-	} else {
-		c = newEndpointChecker(hc, ep, checker)
-		hc.epmaps[id] = c
-		if hc.context != nil { // Has started
+func (hc *HealthChecker) addTarget(id string) {
+	if _, ok := hc.maps[id]; !ok {
+		c := newChecker(hc, id)
+		hc.maps[id] = c
+		if hc.context != nil {
 			go c.Start(hc.context)
 		}
 	}
-
-	hc.updaters.Range(func(_, value interface{}) bool {
-		updater := value.(Updater)
-		updater.UpsertEndpoint(ep)
-		updater.SetEndpointOnline(id, c.Ok())
-		return true
-	})
 }
 
-// RemoveEndpoint removes the endpoint by the endpoint id.
-func (hc *HealthChecker) RemoveEndpoint(epid string) {
-	if epid == "" {
-		panic("the endpoint id is empty")
-	}
-
-	hc.slock.Lock()
-	c, ok := hc.epmaps[epid]
+// DelTarget deletes the target and stops to check its health.
+func (hc *HealthChecker) DelTarget(id string) {
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+	c, ok := hc.maps[id]
 	if ok {
-		delete(hc.epmaps, epid)
+		hc.delTarget(id, c)
 	}
-	hc.slock.Unlock()
-	hc.cleanChecker(epid, c, ok)
 }
 
-func (hc *HealthChecker) cleanChecker(id string, c *epchecker, ok bool) {
+// DelTargets deletes a set of targets and stops to their health.
+func (hc *HealthChecker) DelTargets(ids ...string) {
+	if len(ids) == 0 {
+		return
+	}
+
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+	for _, id := range ids {
+		if c, ok := hc.maps[id]; ok {
+			hc.delTarget(id, c)
+		}
+	}
+}
+
+func (hc *HealthChecker) delTarget(id string, c *_checker) {
+	delete(hc.maps, id)
+	c.Stop()
+
+	// (xgf): we need to call the callback to update the status to offline??
+	// hc.setOnline(id, false)
+}
+
+// ResetTargets resets the targets to the given.
+func (hc *HealthChecker) ResetTargets(ids ...string) {
+	hc.lock.Lock()
+	defer hc.lock.Unlock()
+
+	// add new targets.
+	idm := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		idm[id] = struct{}{}
+		hc.addTarget(id)
+	}
+
+	// remove the redundant targets.
+	for id, c := range hc.maps {
+		if _, ok := idm[id]; !ok {
+			hc.delTarget(id, c)
+		}
+	}
+}
+
+// Targets returns the health statuses of all the targets.
+func (hc *HealthChecker) Targets() map[string]bool {
+	hc.lock.RLock()
+	idm := make(map[string]bool, len(hc.maps))
+	for id, c := range hc.maps {
+		idm[id] = c.Online()
+	}
+	hc.lock.RUnlock()
+	return idm
+}
+
+// Target returns the health status of the given target.
+func (hc *HealthChecker) Target(id string) (online bool, ok bool) {
+	hc.lock.RLock()
+	c, ok := hc.maps[id]
 	if ok {
-		c.Stop()
-		hc.updaters.Range(func(_, value interface{}) bool {
-			value.(Updater).RemoveEndpoint(id)
-			return true
-		})
+		online = c.Online()
 	}
-}
-
-// GetEndpoint returns the endpoint by the endpoint id.
-//
-// Return nil if the endpoint does not exist.
-func (hc *HealthChecker) GetEndpoint(epid string) (ep EndpointInfo, ok bool) {
-	if epid == "" {
-		panic("the endpoint id is empty")
-	}
-
-	hc.slock.RLock()
-	c, ok := hc.epmaps[epid]
-	hc.slock.RUnlock()
-
-	if ok {
-		ep.Online = c.Ok()
-		ep.Checker = c.GetChecker()
-		ep.Endpoint = c.GetEndpoint()
-	}
-	return
-}
-
-var _ endpoint.Endpoint = EndpointInfo{}
-
-// EndpointInfo represents the information of the endpoint.
-type EndpointInfo struct {
-	endpoint.Endpoint
-	Checker Checker
-	Online  bool
-}
-
-// Unwrap unwraps the inner endpoint.
-func (si EndpointInfo) Unwrap() endpoint.Endpoint {
-	return si.Endpoint
-}
-
-// Status overrides the interface method endpoint.Endpoint#Status.
-func (si EndpointInfo) Status() string {
-	if si.Online {
-		return endpoint.StatusOnline
-	}
-	return endpoint.StatusOffline
-}
-
-// GetEndpoints returns all the endpoints.
-func (hc *HealthChecker) GetEndpoints() []EndpointInfo {
-	hc.slock.RLock()
-	eps := make([]EndpointInfo, 0, len(hc.epmaps))
-	for _, c := range hc.epmaps {
-		eps = append(eps, EndpointInfo{
-			Endpoint: c.GetEndpoint(),
-			Checker:  c.GetChecker(),
-			Online:   c.Ok(),
-		})
-	}
-	hc.slock.RUnlock()
-	return eps
-}
-
-// EndpointIsOnline reports whether the endpoint is online.
-func (hc *HealthChecker) EndpointIsOnline(epid string) (online, ok bool) {
-	if epid == "" {
-		panic("the endpoint id is empty")
-	}
-
-	hc.slock.RLock()
-	c, ok := hc.epmaps[epid]
-	hc.slock.RUnlock()
-
-	if ok {
-		online = c.Ok()
-	}
+	hc.lock.RUnlock()
 	return
 }

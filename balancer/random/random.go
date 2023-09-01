@@ -37,7 +37,7 @@ func NewBalancer(policy string) *Balancer {
 
 // Forward forwards the request to one of the backend endpoints.
 func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
-	eps := sd.Endpoints()
+	eps := sd.Onlines()
 	switch _len := len(eps); _len {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints
@@ -61,7 +61,7 @@ func NewWeightedBalancer(policy string) *WeightedBalancer {
 
 // Forward forwards the request to one of the backend endpoints.
 func (b *WeightedBalancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
-	eps := sd.Endpoints()
+	eps := sd.Onlines()
 	_len := len(eps)
 	switch _len {
 	case 0:

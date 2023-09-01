@@ -38,14 +38,14 @@ type Retry struct {
 	balancer.Balancer
 }
 
-// NewRetry returns a new retry balancer.
-func NewRetry(balancer balancer.Balancer, interval time.Duration, maxNum int) Retry {
+// New returns a new retry balancer.
+func New(balancer balancer.Balancer, interval time.Duration, maxNum int) Retry {
 	return Retry{Balancer: balancer, Interval: interval, MaxNumber: maxNum}
 }
 
 // Forward overrides the Forward method.
 func (b Retry) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (resp interface{}, err error) {
-	eps := sd.Endpoints()
+	eps := sd.Onlines()
 	_len := len(eps)
 	switch _len {
 	case 0:

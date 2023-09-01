@@ -18,9 +18,9 @@ import "testing"
 
 func TestManager(t *testing.T) {
 	m := NewManager()
-	m.AddUpstream(NewUpstream("test"))
+	m.Add(New("test"))
 
-	ups := m.GetUpstreams()
+	ups := m.Gets()
 	if _len := len(ups); _len != 1 {
 		t.Errorf("expect %d upstream, but got %d", 1, _len)
 	}

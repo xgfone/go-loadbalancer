@@ -25,7 +25,7 @@ import (
 )
 
 // DefaultBalancer is the default balancer.
-var DefaultBalancer Balancer = roundrobin.NewWeightedBalancer("")
+var DefaultBalancer Balancer = roundrobin.NewBalancer("")
 
 // Forwarder is used to forward the request to one of the backend endpoints.
 type Forwarder interface {

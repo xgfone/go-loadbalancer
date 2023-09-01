@@ -51,7 +51,7 @@ func SetDiscovery(discovery endpoint.Discovery) Option {
 	if discovery == nil {
 		panic("Upstream: the endpoint discovery must not be nil")
 	}
-	return func(u *Upstream) { u.forwarder.SwapEndpointDiscovery(discovery) }
+	return func(u *Upstream) { u.forwarder.SetDiscovery(discovery) }
 }
 
 // SetContextData returns an upstream option to set the context data.
@@ -82,13 +82,15 @@ type Upstream struct {
 	context   atomicvalue.Value[interface{}]
 }
 
-// NewUpstream returns a new upstream with balancer.DefaultBalancer.
-func NewUpstream(name string, options ...Option) *Upstream {
+var defaultDiscovery = new(endpoint.Static)
+
+// New returns a new upstream with balancer.DefaultBalancer.
+func New(name string, options ...Option) *Upstream {
 	if name == "" {
 		panic("Upstream: name must not be empty")
 	}
 
-	up := &Upstream{forwarder: forwarder.NewForwarder(name, balancer.DefaultBalancer)}
+	up := &Upstream{forwarder: forwarder.New(name, balancer.DefaultBalancer, defaultDiscovery)}
 	up.Update(options...)
 	return up
 }
@@ -103,7 +105,7 @@ func (up *Upstream) Policy() string { return up.forwarder.GetBalancer().Policy()
 func (up *Upstream) ContextData() interface{} { return up.context.Load() }
 
 // Endpoints returns the endpoint discovery.
-func (up *Upstream) Discovery() endpoint.Discovery { return up.forwarder.GetEndpointDiscovery() }
+func (up *Upstream) Discovery() endpoint.Discovery { return up.forwarder.GetDiscovery() }
 
 // Timeout returns the timeout.
 func (up *Upstream) Timeout() time.Duration { return up.forwarder.GetTimeout() }

@@ -30,16 +30,17 @@ type Manager struct {
 	ups  map[string]*Upstream
 	upm  atomicvalue.Value[map[string]*Upstream]
 
-	add atomicvalue.Value[func(*Upstream)]
-	del atomicvalue.Value[func(*Upstream)]
+	addf atomicvalue.Value[func(*Upstream)]
+	delf atomicvalue.Value[func(*Upstream)]
 }
 
 // NewManager returns a new upstream manager.
 func NewManager() *Manager {
-	m := &Manager{ups: make(map[string]*Upstream, 8)}
-	m.OnAdd(nil)
-	m.OnDel(nil)
-	return m
+	return &Manager{
+		ups:  make(map[string]*Upstream, 8),
+		addf: atomicvalue.NewValue(onNothing),
+		delf: atomicvalue.NewValue(onNothing),
+	}
 }
 
 func (m *Manager) updateUpstreams() { m.upm.Store(maps.Clone(m.ups)) }
@@ -49,7 +50,7 @@ func (m *Manager) OnAdd(f func(*Upstream)) {
 	if f == nil {
 		f = onNothing
 	}
-	m.add.Store(f)
+	m.addf.Store(f)
 }
 
 // OnDel sets the callback function, which is called when an upstream is deleted.
@@ -57,25 +58,25 @@ func (m *Manager) OnDel(f func(*Upstream)) {
 	if f == nil {
 		f = onNothing
 	}
-	m.del.Store(f)
+	m.delf.Store(f)
 }
 
 func onNothing(*Upstream) {}
 
 func (m *Manager) onadd(up *Upstream, ok bool) bool {
 	if ok {
-		m.add.Load()(up)
+		m.addf.Load()(up)
 	}
 	return ok
 }
 
 func (m *Manager) ondel(up *Upstream, ok bool) {
 	if ok {
-		m.del.Load()(up)
+		m.delf.Load()(up)
 	}
 }
 
-func (m *Manager) addUpstream(up *Upstream) (ok bool) {
+func (m *Manager) add(up *Upstream) (ok bool) {
 	m.lock.Lock()
 	_, ok = m.ups[up.Name()]
 	if ok = !ok; ok {
@@ -86,14 +87,14 @@ func (m *Manager) addUpstream(up *Upstream) (ok bool) {
 	return
 }
 
-// AddUpstream tries to add an upstream.
+// Add tries to add an upstream.
 //
 // If the upstream has existed, it does nothing and returns false.
-func (m *Manager) AddUpstream(up *Upstream) (ok bool) {
-	return m.onadd(up, m.addUpstream(up))
+func (m *Manager) Add(up *Upstream) (ok bool) {
+	return m.onadd(up, m.add(up))
 }
 
-func (m *Manager) delUpstream(name string) *Upstream {
+func (m *Manager) del(name string) *Upstream {
 	m.lock.Lock()
 	up, ok := m.ups[name]
 	if ok {
@@ -104,24 +105,24 @@ func (m *Manager) delUpstream(name string) *Upstream {
 	return up
 }
 
-// AddUpstream tries to delete an upstream by the name and return it.
+// Delete tries to delete an upstream by the name and return it.
 //
 // If the upstream does not exist, it does nothing and returns nil.
-func (m *Manager) DeleteUpstream(name string) *Upstream {
-	up := m.delUpstream(name)
+func (m *Manager) Delete(name string) *Upstream {
+	up := m.del(name)
 	m.ondel(up, up != nil)
 	return up
 }
 
-// UpdateUpstream updates an upstream with the options.
+// Update updates an upstream with the options.
 //
 // If the upstream named name does not exist, it does nothing and return false.
-func (m *Manager) UpdateUpstream(name string, options ...Option) (ok bool) {
+func (m *Manager) Update(name string, options ...Option) (ok bool) {
 	if len(options) == 0 {
 		return false
 	}
 
-	up := m.GetUpstream(name)
+	up := m.Get(name)
 	if ok = up != nil; ok {
 		up.Update(options...)
 		m.updateUpstreams()
@@ -130,8 +131,8 @@ func (m *Manager) UpdateUpstream(name string, options ...Option) (ok bool) {
 	return
 }
 
-// ResetUpstreams resets the upstreams.
-func (m *Manager) ResetUpstreams(upstreams map[string][]Option) {
+// Reset resets the upstreams.
+func (m *Manager) Reset(upstreams map[string][]Option) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -140,7 +141,7 @@ func (m *Manager) ResetUpstreams(upstreams map[string][]Option) {
 		if up, ok := m.ups[name]; ok {
 			up.Update(options...)
 		} else {
-			up := NewUpstream(name, options...)
+			up := New(name, options...)
 			m.ups[name] = up
 			m.onadd(up, true)
 		}
@@ -157,8 +158,8 @@ func (m *Manager) ResetUpstreams(upstreams map[string][]Option) {
 	m.updateUpstreams()
 }
 
-// GetUpstreams returns all the upstreams, which is read-only.
-func (m *Manager) GetUpstreams() map[string]*Upstream { return m.upm.Load() }
+// Gets returns all the upstreams, which is read-only.
+func (m *Manager) Gets() map[string]*Upstream { return m.upm.Load() }
 
 // GetUpstream returns the upstream by the name.
-func (m *Manager) GetUpstream(name string) *Upstream { return m.upm.Load()[name] }
+func (m *Manager) Get(name string) *Upstream { return m.upm.Load()[name] }

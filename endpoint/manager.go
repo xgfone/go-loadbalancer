@@ -15,211 +15,309 @@
 package endpoint
 
 import (
-	"slices"
 	"sync"
+	"sync/atomic"
 
 	"github.com/xgfone/go-atomicvalue"
 )
 
-var _ Discovery = new(Manager)
+type epwrapper struct {
+	ep atomicvalue.Value[Endpoint]
+	ok atomic.Bool
+}
+
+func newEndpointWrapper(ep Endpoint) *epwrapper {
+	return &epwrapper{ep: atomicvalue.NewValue(ep)}
+}
+
+func (w *epwrapper) Online() bool               { return w.ok.Load() }
+func (w *epwrapper) SetOnline(online bool) bool { return w.ok.Swap(online) != online }
+
+func (w *epwrapper) Endpoint() Endpoint      { return w.ep.Load() }
+func (w *epwrapper) SetEndpoint(ep Endpoint) { w.ep.Store(ep) }
 
 // Manager is used to manage a group of endpoints.
 type Manager struct {
-	lock sync.RWMutex
-	eps  map[string]Endpoint
-
-	oneps  atomicvalue.Value[*epswrapper]
-	offeps atomicvalue.Value[*epswrapper]
-	alleps atomicvalue.Value[*epswrapper]
+	lock   sync.RWMutex
+	alleps map[string]*epwrapper
+	oneps  atomicvalue.Value[*Static]
 }
+
+var defaultStatic = new(Static)
 
 // NewManager returns a new endpoint manager.
 func NewManager(initcap int) *Manager {
-	return &Manager{eps: make(map[string]Endpoint, initcap)}
-}
-
-// Len implements the interface Discovery#Len,
-// which returns the length of the online endpoints.
-func (m *Manager) Len() int { return len(m.OnEndpoints()) }
-
-// Endpoints is the alias of OnEndpoints,
-// which implements the interface Discovery#Endpoints,
-func (m *Manager) Endpoints() Endpoints { return m.OnEndpoints() }
-
-// OnEndpoints returns all the online endpoints, which is read-only.
-func (m *Manager) OnEndpoints() Endpoints { return m.oneps.Load().Unwrap() }
-
-// OffEndpoints returns all the offline endpoints, which is read-only.
-func (m *Manager) OffEndpoints() Endpoints { return m.offeps.Load().Unwrap() }
-
-// AllEndpoints returns all the endpoints, which is read-only.
-func (m *Manager) AllEndpoints() Endpoints { return m.alleps.Load().Unwrap() }
-
-// SetEndpointStatus sets the status of the endpoint.
-func (m *Manager) SetEndpointStatus(epid string, status string) {
-	if ep, ok := m.GetEndpoint(epid); ok {
-		ep.SetStatus(status)
-
-		m.lock.RLock()
-		m.updateEndpointsStatus()
-		m.lock.RUnlock()
+	return &Manager{
+		alleps: make(map[string]*epwrapper, initcap),
+		oneps:  atomicvalue.NewValue(defaultStatic),
 	}
 }
 
-// SetEndpointStatuses sets the statuses of a group of endpoints.
-func (m *Manager) SetEndpointStatuses(epid2statuses map[string]string) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+var _ Discovery = new(Manager)
 
-	var changed bool
-	for epid, status := range epid2statuses {
-		if ep, ok := m.eps[epid]; ok {
-			ep.SetStatus(status)
-			changed = true
+// Onlen returns the length of the online endpoints.
+// which implements the interface Discovery#Onlen,
+func (m *Manager) Onlen() int { return len(m.On()) }
+
+// Onlines is the alias of OnEndpoints,
+// which implements the interface Discovery#Onlines,
+func (m *Manager) Onlines() Endpoints { return m.On() }
+
+// On returns all the online endpoints, which is read-only.
+func (m *Manager) On() Endpoints { return m.oneps.Load().Endpoints }
+
+// Off returns all the offline endpoints.
+func (m *Manager) Off() Endpoints {
+	m.lock.RLock()
+	eps := make(Endpoints, 0, len(m.alleps)/4)
+	for _, w := range m.alleps {
+		if !w.Online() {
+			eps = append(eps, w.Endpoint())
 		}
 	}
+	m.lock.RUnlock()
+	return eps
+}
 
-	if changed {
-		m.updateEndpointsStatus()
+// All returns all the endpoints with the online status.
+func (m *Manager) All() map[Endpoint]bool {
+	m.lock.RLock()
+	eps := make(map[Endpoint]bool, len(m.alleps))
+	for _, w := range m.alleps {
+		eps[w.Endpoint()] = w.Online()
+	}
+	m.lock.RUnlock()
+	return eps
+}
+
+// Range ranges all the endpoints until the range function returns false
+// or all the endpoints are ranged.
+func (m *Manager) Range(f func(ep Endpoint, online bool) bool) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	for _, w := range m.alleps {
+		if !f(w.Endpoint(), w.Online()) {
+			break
+		}
 	}
 }
 
-// GetEndpoint returns the endpoint by the id.
-func (m *Manager) GetEndpoint(epid string) (ep Endpoint, ok bool) {
+// Len returns the length of all the endpoints.
+func (m *Manager) Len() int {
 	m.lock.RLock()
-	ep, ok = m.eps[epid]
+	n := len(m.alleps)
 	m.lock.RUnlock()
+	return n
+}
+
+// Get returns the endpoint by the id.
+//
+// If not exist, return (nil, false).
+func (m *Manager) Get(epid string) (ep Endpoint, online bool) {
+	m.lock.RLock()
+	w := m.alleps[epid]
+	m.lock.RUnlock()
+
+	if w != nil {
+		ep = w.Endpoint()
+		online = w.Online()
+	}
 	return
 }
 
-// ResetEndpoints resets all the endpoints to the news.
-func (m *Manager) ResetEndpoints(news ...Endpoint) {
+// Delete deletes the endpoint by the id.
+//
+// If not exist, do nothing.
+func (m *Manager) Delete(epid string) {
+	if len(epid) == 0 {
+		return
+	}
+
 	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	for _, ep := range news {
-		if _ep, ok := m.eps[ep.ID()]; ok { // Update
-			_ = _ep.Update(ep.Info())
-		} else { // Add
-			m.eps[ep.ID()] = ep
+	if w, ok := m.alleps[epid]; ok {
+		delete(m.alleps, epid)
+		if w.Online() {
+			m.updateEndpoints()
 		}
 	}
-
-	for id := range m.eps {
-		index := slices.IndexFunc(news, func(ep Endpoint) bool { return ep.ID() == id })
-		if index == -1 { // Not Exist, and Delete
-			delete(m.eps, id)
-		}
-	}
-
-	m.updateEndpoints()
+	m.lock.Unlock()
 }
 
-// UpsertEndpoints adds or updates the endpoints.
-func (m *Manager) UpsertEndpoints(eps ...Endpoint) {
+// Deletes deletes a set of endpoints by the ids.
+//
+// If not exist, do nothing.
+func (m *Manager) Deletes(epids ...string) {
+	if len(epids) == 0 {
+		return
+	}
+
+	m.lock.Lock()
+	var changed bool
+	for _, epid := range epids {
+		if w, ok := m.alleps[epid]; ok {
+			delete(m.alleps, epid)
+			if w.Online() {
+				changed = true
+			}
+		}
+	}
+	if changed {
+		m.updateEndpoints()
+	}
+	m.lock.Unlock()
+}
+
+// Add adds the endpoint.
+//
+// If exist, do nothing and return false. Or, return true.
+//
+// NOTICE: the initial online status of the endpoint is false.
+func (m *Manager) Add(ep Endpoint) (ok bool) {
+	if ep == nil {
+		panic("Manager.AddEndpoint: endpoint must not be nil")
+	}
+
+	id := ep.ID()
+	m.lock.Lock()
+	if _, ok = m.alleps[id]; !ok {
+		m.alleps[id] = newEndpointWrapper(ep)
+	}
+	m.lock.Unlock()
+	return
+}
+
+// Adds adds a set of endpoints.
+//
+// If a certain endpoint has existed, do nothing.
+//
+// NOTICE: the initial online status of the added endpoint is false.
+func (m *Manager) Adds(eps ...Endpoint) {
 	if len(eps) == 0 {
 		return
 	}
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
-
-	var new bool
 	for _, ep := range eps {
-		if _ep, ok := m.eps[ep.ID()]; ok {
-			_ = _ep.Update(ep.Info())
-		} else {
-			new = true
-			m.eps[ep.ID()] = ep
+		id := ep.ID()
+		if _, ok := m.alleps[id]; !ok {
+			m.alleps[id] = newEndpointWrapper(ep)
 		}
-	}
-	if new {
-		m.updateEndpoints()
+
 	}
 }
 
-// UpsertEndpoint adds or updates an endpoint,
-// which also implements the interface healthcheck.Updater#UpsertEndpoint.
-func (m *Manager) UpsertEndpoint(ep Endpoint) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+// Upsert adds the endpoint if not exist and return true,
+// or replaces the endpoint and returns false.
+//
+// NOTICE: the initial online status of the added endpoint is false.
+func (m *Manager) Upsert(ep Endpoint) (ok bool) {
+	if ep == nil {
+		panic("Manager.AddEndpoint: endpoint must not be nil")
+	}
 
 	id := ep.ID()
-	if _ep, ok := m.eps[id]; ok {
-		_ = _ep.Update(ep.Info())
+	m.lock.Lock()
+	m.upsert(id, ep)
+	m.lock.Unlock()
+	return !ok
+}
+
+func (m *Manager) upsert(id string, ep Endpoint) {
+	w, ok := m.alleps[id]
+	if ok {
+		w.SetEndpoint(ep)
+		if w.Online() {
+			m.updateEndpoints()
+		}
 	} else {
-		m.eps[id] = ep
-		m.updateEndpoints()
+		m.alleps[id] = newEndpointWrapper(ep)
 	}
 }
 
-// RemoveEndpoint removes the endpoint by the id,
-// which also implements the interface healthcheck.Updater#RemoveEndpoint.
-func (m *Manager) RemoveEndpoint(epid string) {
+// Upserts adds a set of endpoints if not exist, or replaces them.
+//
+// NOTICE: the initial online status of the added endpoint is false.
+func (m *Manager) Upserts(eps ...Endpoint) {
+	if len(eps) == 0 {
+		return
+	}
+
 	m.lock.Lock()
 	defer m.lock.Unlock()
-
-	if _, ok := m.eps[epid]; ok {
-		delete(m.eps, epid)
-		m.updateEndpoints()
+	for _, ep := range eps {
+		m.upsert(ep.ID(), ep)
 	}
 }
 
-// SetEndpointOnline is the same as SetEndpointStatus,
-// but use the bool online instead of StatusOnline or StatusOffline,
-// which also implements the interface healthcheck.Updater#SetEndpointOnline.
-func (m *Manager) SetEndpointOnline(epid string, online bool) {
-	if online {
-		m.SetEndpointStatus(epid, StatusOnline)
-	} else {
-		m.SetEndpointStatus(epid, StatusOffline)
+// Clear clears all the endpoints.
+func (m *Manager) Clear() {
+	m.lock.Lock()
+	if len(m.alleps) > 0 {
+		clear(m.alleps)
+		m.updateEndpoints()
 	}
+	m.lock.Unlock()
+}
+
+// SetOnline sets the online status of the endpoint.
+func (m *Manager) SetOnline(epid string, online bool) {
+	m.lock.Lock()
+	if w := m.alleps[epid]; w != nil {
+		if w.SetOnline(online) {
+			m.updateEndpoints()
+		}
+	}
+	m.lock.Unlock()
+}
+
+// SetOnlines sets the online statuses of a set of endpoints.
+func (m *Manager) SetOnlines(onlines map[string]bool) {
+	m.lock.Lock()
+	var changed bool
+	for epid, online := range onlines {
+		if w := m.alleps[epid]; w != nil {
+			if w.SetOnline(online) {
+				changed = true
+			}
+		}
+	}
+	if changed {
+		m.updateEndpoints()
+	}
+	m.lock.Unlock()
+}
+
+// SetAllOnline sets the online status of all the endpoints to online.
+func (m *Manager) SetAllOnline(online bool) {
+	m.lock.Lock()
+	var changed bool
+	for _, w := range m.alleps {
+		if w.SetOnline(online) {
+			changed = true
+		}
+	}
+	if changed {
+		m.updateEndpoints()
+	}
+	m.lock.Unlock()
 }
 
 func (m *Manager) updateEndpoints() {
-	oneps := Acquire(len(m.eps))
-	alleps := Acquire(len(m.eps))
-	offeps := Acquire(0)
-	for _, ep := range m.eps {
-		alleps.Endpoints = append(alleps.Endpoints, ep)
-		switch ep.Status() {
-		case StatusOnline:
-			oneps.Endpoints = append(oneps.Endpoints, ep)
-		case StatusOffline:
-			offeps.Endpoints = append(offeps.Endpoints, ep)
+	oneps := defaultStatic
+	if _len := len(m.alleps); _len > 0 {
+		oneps = Acquire(len(m.alleps))
+		for _, w := range m.alleps {
+			if w.Online() {
+				oneps.Endpoints = append(oneps.Endpoints, w.Endpoint())
+			}
 		}
+		Sort(oneps.Endpoints)
 	}
 
-	swapEndpoints(&m.oneps, oneps)   // For online
-	swapEndpoints(&m.offeps, offeps) // For offline
-	swapEndpoints(&m.alleps, alleps) // For all
-}
-
-func (m *Manager) updateEndpointsStatus() {
-	oneps := Acquire(len(m.eps))
-	offeps := Acquire(0)
-
-	for _, ep := range m.AllEndpoints() {
-		switch ep.Status() {
-		case StatusOnline:
-			oneps.Endpoints = append(oneps.Endpoints, ep)
-		case StatusOffline:
-			offeps.Endpoints = append(offeps.Endpoints, ep)
-		}
-	}
-
-	swapEndpoints(&m.oneps, oneps)   // For online
-	swapEndpoints(&m.offeps, offeps) // For offline
-}
-
-func swapEndpoints(dsteps *atomicvalue.Value[*epswrapper], neweps *epswrapper) {
-	if len(neweps.Endpoints) == 0 {
-		oldeps := dsteps.Swap(nil)
-		Release(oldeps)
-		Release(neweps)
-	} else {
-		Sort(neweps.Endpoints)
-		oldeps := dsteps.Swap(neweps)
+	if oldeps := m.oneps.Swap(oneps); cap(oldeps.Endpoints) > 0 {
+		clear(oldeps.Endpoints)
+		oldeps.Endpoints = oldeps.Endpoints[:0]
 		Release(oldeps)
 	}
 }

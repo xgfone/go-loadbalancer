@@ -29,14 +29,14 @@ type forwarder interface {
 // BenchBalancer benchmarks the forwarder.
 func BenchBalancer(b *testing.B, forwarder forwarder) {
 	eps := endpoint.Endpoints{
-		NewEndpoint("127.0.0.1", 1),
-		NewEndpoint("127.0.0.2", 2),
-		NewEndpoint("127.0.0.3", 3),
-		NewEndpoint("127.0.0.4", 4),
-		NewEndpoint("127.0.0.5", 5),
-		NewEndpoint("127.0.0.6", 6),
-		NewEndpoint("127.0.0.7", 7),
-		NewEndpoint("127.0.0.8", 8),
+		endpoint.Noop("127.0.0.1", 1),
+		endpoint.Noop("127.0.0.2", 2),
+		endpoint.Noop("127.0.0.3", 3),
+		endpoint.Noop("127.0.0.4", 4),
+		endpoint.Noop("127.0.0.5", 5),
+		endpoint.Noop("127.0.0.6", 6),
+		endpoint.Noop("127.0.0.7", 7),
+		endpoint.Noop("127.0.0.8", 8),
 	}
 
 	endpoint.Release(endpoint.Acquire(len(eps)))

@@ -15,16 +15,15 @@
 // Package endpoint provides a backend endpoint based on the stdlib
 // "net/http".
 //
-// NOTICE: THIS IS ONLY A SIMPLE EXAMPLE, AND YOU SHOULD IMPLEMENT YOURSELF.
+// NOTICE: THIS IS ONLY A SIMPLE EXAMPLE, AND YOU MAYBE IMPLEMENT YOURSELF.
 package endpoint
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
-	"sync/atomic"
-	"time"
 
 	"github.com/xgfone/go-loadbalancer/endpoint"
 )
@@ -40,79 +39,37 @@ func (c Config) ID() string {
 	return net.JoinHostPort(c.Host, strconv.FormatUint(uint64(c.Port), 10))
 }
 
-// NewEndpoint returns a new endpoint, which will get the http request
-// by the function defaults.GetHTTPRequest.
-func (c Config) NewEndpoint() endpoint.WeightedEndpoint {
+// NewEndpoint returns a new endpoint.
+//
+// For the argument request, it may be one of types:
+//
+//	*http.Request
+//	interface{ Request() *http.Request }
+func (c Config) NewEndpoint() endpoint.WeightEndpoint {
 	if c.Host == "" {
 		panic("HttpEndpoint: host must not be empty")
 	}
 	if c.Port == 0 {
 		panic("HttpEndpoint: port must not be 0")
 	}
-	return newServer(c.ID(), c)
-}
 
-// ------------------------------------------------------------------------- //
+	host := c.ID()
+	return endpoint.New(host, c.Weight, func(c context.Context, i interface{}) (interface{}, error) {
+		var req *http.Request
+		switch r := i.(type) {
+		case *http.Request:
+			req = r
+		case interface{ Request() *http.Request }:
+			req = r.Request()
+		default:
+			panic(fmt.Errorf("HttpEndpoint: unknown request type %T", i))
+		}
 
-type server struct {
-	host string
-	conf atomic.Value
-	endpoint.StatusManager
-}
-
-func newServer(host string, conf Config) *server {
-	s := new(server)
-	s.setConf(conf)
-	s.SetStatus(endpoint.StatusOnline)
-	s.host = host
-	return s
-}
-
-func (s *server) String() string { return s.host }
-
-func (s *server) getConf() Config  { return s.conf.Load().(Config) }
-func (s *server) setConf(c Config) { s.conf.Store(c) }
-
-func (s *server) ID() string                    { return s.host }
-func (s *server) Info() interface{}             { return s.getConf() }
-func (s *server) Update(info interface{}) error { s.setConf(info.(Config)); return nil }
-
-func (s *server) Weight() int {
-	if conf := s.getConf(); conf.Weight > 0 {
-		return conf.Weight
-	}
-	return 1
-}
-
-func (s *server) Serve(ctx context.Context, req interface{}) (interface{}, error) {
-	_req := req.(*http.Request)
-	_req.URL.Host = s.host
-	return http.DefaultClient.Do(_req)
-}
-
-func (s *server) Check(ctx context.Context, req interface{}) (ok bool) {
-	if req == nil {
-		return s.checkTCP()
-	}
-	return s.checkHTTP(ctx, req.(*http.Request))
-}
-
-func (s *server) checkHTTP(ctx context.Context, req *http.Request) (ok bool) {
-	req.RequestURI = ""
-	req.URL.Host = s.host
-	resp, err := http.DefaultClient.Do(req)
-	ok = err == nil && resp.StatusCode < 500
-	if resp != nil {
-		resp.Body.Close()
-	}
-	return
-}
-
-func (s *server) checkTCP() (ok bool) {
-	conn, err := net.DialTimeout("tcp", s.host, time.Second)
-	ok = err == nil
-	if conn != nil {
-		conn.Close()
-	}
-	return
+		req.URL.Host = host
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil && resp != nil {
+			resp.Body.Close() // For status code 3xx
+		}
+		return resp, err
+	})
 }

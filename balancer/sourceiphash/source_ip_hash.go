@@ -57,7 +57,7 @@ func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
 func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
-	eps := sd.Endpoints()
+	eps := sd.Onlines()
 	_len := len(eps)
 	switch _len {
 	case 0:

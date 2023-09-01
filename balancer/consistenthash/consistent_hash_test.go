@@ -23,15 +23,14 @@ import (
 
 	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/endpoint/extep"
-	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
 func TestBalancer(t *testing.T) {
 	eps := endpoint.Endpoints{
-		extep.NewStateEndpoint(tests.NewEndpoint("1.2.3.4:8000", 1)),
-		extep.NewStateEndpoint(tests.NewEndpoint("1.2.3.4:8080", 1)),
-		extep.NewStateEndpoint(tests.NewEndpoint("5.6.7.8:8000", 1)),
-		extep.NewStateEndpoint(tests.NewEndpoint("5.6.7.8:8080", 1)),
+		extep.NewStateEndpoint(endpoint.Noop("1.2.3.4:8000", 1)),
+		extep.NewStateEndpoint(endpoint.Noop("1.2.3.4:8080", 1)),
+		extep.NewStateEndpoint(endpoint.Noop("5.6.7.8:8000", 1)),
+		extep.NewStateEndpoint(endpoint.Noop("5.6.7.8:8080", 1)),
 	}
 
 	balancer := NewBalancer("chash_ip", func(req interface{}) int {

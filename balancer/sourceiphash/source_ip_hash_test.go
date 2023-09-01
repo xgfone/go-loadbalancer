@@ -29,9 +29,9 @@ func BenchmarkSourceIPHash(b *testing.B) {
 }
 
 func TestSourceIPHash(t *testing.T) {
-	ep1 := extep.NewStateEndpoint(tests.NewEndpoint("127.0.0.1", 1))
-	ep2 := extep.NewStateEndpoint(tests.NewEndpoint("127.0.0.2", 2))
-	ep3 := extep.NewStateEndpoint(tests.NewEndpoint("127.0.0.3", 3))
+	ep1 := extep.NewStateEndpoint(endpoint.Noop("127.0.0.1", 1))
+	ep2 := extep.NewStateEndpoint(endpoint.Noop("127.0.0.2", 2))
+	ep3 := extep.NewStateEndpoint(endpoint.Noop("127.0.0.3", 3))
 	eps := endpoint.Endpoints{ep1, ep2, ep3}
 
 	req1, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)

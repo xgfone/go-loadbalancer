@@ -15,7 +15,6 @@
 package forwarder
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -37,22 +36,6 @@ func testHandler(key string) http.Handler {
 }
 
 func TestLoadBalancer(t *testing.T) {
-	balancer := roundrobin.NewBalancer("")
-	forwarder := NewForwarder("test", balancer)
-	forwarder.SwapBalancer(retry.NewRetry(balancer, 0, 0))
-
-	go func() {
-		server := http.Server{Addr: "127.0.0.1:8101", Handler: testHandler("8101")}
-		_ = server.ListenAndServe()
-	}()
-
-	go func() {
-		server := http.Server{Addr: "127.0.0.1:8102", Handler: testHandler("8102")}
-		_ = server.ListenAndServe()
-	}()
-
-	time.Sleep(time.Millisecond * 100)
-
 	ep1 := extep.NewStateEndpoint(httpep.Config{
 		Host:   "127.0.0.1",
 		Port:   8101,
@@ -65,14 +48,23 @@ func TestLoadBalancer(t *testing.T) {
 		Weight: 2,
 	}.NewEndpoint())
 
-	if url := ep1.Info().(httpep.Config).ID(); url != "127.0.0.1:8101" {
-		t.Errorf("expect '%s', but got '%s'", "127.0.0.1:8101", url)
-	}
-	if ok := ep1.Check(context.Background(), nil); !ok {
-		t.Errorf("the endpoint is offline")
+	discovery := &endpoint.Static{
+		Endpoints: endpoint.Endpoints{ep1, ep2},
 	}
 
-	forwarder.EndpointManager().ResetEndpoints(ep1, ep2)
+	forwarder := New("test", retry.New(roundrobin.NewBalancer(""), 0, 0), discovery)
+
+	go func() {
+		server := http.Server{Addr: "127.0.0.1:8101", Handler: testHandler("8101")}
+		_ = server.ListenAndServe()
+	}()
+
+	go func() {
+		server := http.Server{Addr: "127.0.0.1:8102", Handler: testHandler("8102")}
+		_ = server.ListenAndServe()
+	}()
+
+	time.Sleep(time.Millisecond * 100)
 
 	rec := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
@@ -105,64 +97,5 @@ func TestLoadBalancer(t *testing.T) {
 	}
 	if state.Failure != 0 {
 		t.Errorf("expect %d failure requests, but got %d", 0, state.Failure)
-	}
-
-	/// ------------------------------------------------------------------ ///
-
-	forwarder.SetEndpointOnline(ep1.ID(), false)
-	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep1.ID()); !ok || endpoint.IsOnline(ep) {
-		t.Errorf("invalid the endpoint1 online status: online=%v, ok=%v", endpoint.IsOnline(ep), ok)
-	}
-	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep2.ID()); !ok || !endpoint.IsOnline(ep) {
-		t.Errorf("invalid the endpoint2 online status: online=%v, ok=%v", endpoint.IsOnline(ep), ok)
-	}
-
-	rec.Body.Reset()
-	forwarder.ServeHTTP(rec, req)
-	forwarder.ServeHTTP(rec, req)
-	expects = []string{
-		"8102",
-		"8102",
-		"",
-	}
-	results = strings.Split(rec.Body.String(), "\n")
-	if len(expects) != len(results) {
-		t.Errorf("expect %d lines, but got %d: %v", len(expects), len(results), results)
-	} else {
-		for i, line := range results {
-			if line != expects[i] {
-				t.Errorf("%d line: expect '%s', but got '%s'", i, expects[i], line)
-			}
-		}
-	}
-
-	/// ------------------------------------------------------------------ ///
-
-	forwarder.SetEndpointOnline(ep2.ID(), false)
-	if ep, ok := forwarder.EndpointManager().GetEndpoint(ep2.ID()); !ok || endpoint.IsOnline(ep) {
-		t.Errorf("invalid the endpoint2 online status: online=%v, ok=%v", endpoint.IsOnline(ep), ok)
-	}
-
-	eps := forwarder.EndpointManager().AllEndpoints()
-	if len(eps) != 2 {
-		t.Errorf("expect %d endpoints, but got %d", 2, len(eps))
-	}
-	for _, ep := range eps {
-		id := ep.ID()
-		switch id {
-		case ep1.ID(), ep2.ID():
-		default:
-			t.Errorf("unknown endpoint id '%s'", id)
-		}
-
-		if endpoint.IsOnline(ep) {
-			t.Errorf("expect endpoint '%s' online is false, but got true", id)
-		}
-	}
-
-	rec = httptest.NewRecorder()
-	forwarder.ServeHTTP(rec, req)
-	if rec.Code != 503 {
-		t.Errorf("unexpected response: statuscode=%d, body=%s", rec.Code, rec.Body.String())
 	}
 }

@@ -19,13 +19,17 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/xgfone/go-loadbalancer/balancer/random"
-	"github.com/xgfone/go-loadbalancer/internal/tests"
+	"github.com/xgfone/go-loadbalancer/balancer/roundrobin"
+	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
 func BenchmarkLoadBalancer(b *testing.B) {
-	f := NewForwarder("test", random.NewBalancer(""))
-	f.EndpointManager().ResetEndpoints(tests.NewEndpoint("127.0.0.1", 1), tests.NewEndpoint("127.0.0.2", 1))
+	f := New("test", roundrobin.NewBalancer(""), &endpoint.Static{
+		Endpoints: endpoint.Endpoints{
+			endpoint.Noop("127.0.0.1", 1),
+			endpoint.Noop("127.0.0.2", 1),
+		},
+	})
 
 	rec := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
