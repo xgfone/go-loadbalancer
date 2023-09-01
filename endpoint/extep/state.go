@@ -101,7 +101,7 @@ type stateep struct {
 	state   State
 }
 
-func (ep *stateep) ID() string   { return "" }
+func (ep *stateep) ID() string   { return ep.Unwrap().ID() }
 func (ep *stateep) State() State { return ep.state.Clone() }
 
 func (ep *stateep) Unwrap() endpoint.Endpoint { return ep.wrapper.Load() }
