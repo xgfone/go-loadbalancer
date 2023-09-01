@@ -18,6 +18,7 @@ import (
 	"context"
 	"sync/atomic"
 
+	"github.com/xgfone/go-atomicvalue"
 	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
@@ -83,26 +84,39 @@ func GetState(ep endpoint.Endpoint) State {
 // StateEndpoint is an extended endpoint supporting the state.
 type StateEndpoint interface {
 	endpoint.Endpoint
+	Reset(endpoint.Endpoint)
 	State() State
 }
 
 // NewStateEndpoint returns a new state endpoint.
 func NewStateEndpoint(ep endpoint.Endpoint) StateEndpoint {
-	return &stateep{Endpoint: ep}
+	if ep == nil {
+		panic("NewStateEndpoint: endpoint must not be nil")
+	}
+	return &stateep{wrapper: atomicvalue.NewValue(ep)}
 }
 
 type stateep struct {
-	endpoint.Endpoint
-	state State
+	wrapper atomicvalue.Value[endpoint.Endpoint]
+	state   State
 }
 
-func (s *stateep) State() State              { return s.state.Clone() }
-func (s *stateep) Unwrap() endpoint.Endpoint { return s.Endpoint }
-func (s *stateep) Serve(c context.Context, r interface{}) (rp interface{}, e error) {
-	s.state.Inc()
-	defer s.state.Dec()
-	if rp, e = s.Endpoint.Serve(c, r); e != nil {
-		s.state.IncFailure()
+func (ep *stateep) ID() string   { return "" }
+func (ep *stateep) State() State { return ep.state.Clone() }
+
+func (ep *stateep) Unwrap() endpoint.Endpoint { return ep.wrapper.Load() }
+func (ep *stateep) Reset(e endpoint.Endpoint) {
+	if e == nil {
+		panic("StateEndpoint.Reset: endpoint must not be nil")
+	}
+	ep.wrapper.Store(e)
+}
+
+func (ep *stateep) Serve(c context.Context, r interface{}) (rp interface{}, e error) {
+	ep.state.Inc()
+	defer ep.state.Dec()
+	if rp, e = ep.Unwrap().Serve(c, r); e != nil {
+		ep.state.IncFailure()
 	}
 	return
 }
