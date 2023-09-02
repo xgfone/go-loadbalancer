@@ -15,16 +15,12 @@
 package tests
 
 import (
-	"context"
-
 	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
-func noop(context.Context, any) (any, error) { return nil, nil }
-
 // NewNoopEndpoint returns an endpoint that do nothing.
 func NewNoopEndpoint(id string, weight int) *endpoint.Endpoint {
-	e := endpoint.New(id, noop)
+	e := endpoint.New(id, nil)
 	e.SetWeight(weight)
 	return e
 }

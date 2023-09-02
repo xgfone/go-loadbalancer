@@ -35,18 +35,31 @@ type Endpoint struct {
 	config atomicvalue.Value[any]
 }
 
-// New returns a new common endpoint with id, weight and serve function.
+// New returns a new common endpoint with the id and serve function.
+//
+// If serve is nil, use a no-op function instead.
 func New(id string, serve loadbalancer.ServeFunc) *Endpoint {
 	if id == "" {
 		panic("endpoint.New: id must not be empty")
 	}
 	if serve == nil {
-		panic("endpoint.New: serve function must not be nil")
+		serve = noop
 	}
-
-	e := &Endpoint{id: id, serve: serve}
+	e := &Endpoint{id: id, serve: noop}
 	e.SetWeight(1)
 	return e
+}
+
+func noop(context.Context, any) (any, error) { return nil, nil }
+
+// SetServe is used to delay to set the serve function of the endpoint.
+//
+// NOTICE: it is not thread-safe, so should be called before using it.
+func (e *Endpoint) SetServe(serve loadbalancer.ServeFunc) {
+	if serve == nil {
+		panic("Endpoint.SetServe: serve function must not be nil")
+	}
+	e.serve = serve
 }
 
 // Serve returns the endpoint id, which implements the interface loadbalancer.Endpoint#ID.
@@ -70,22 +83,32 @@ func (e *Endpoint) inc() {
 func (e *Endpoint) dec() { atomic.AddInt32(&e.concur, -1) }
 
 // Total returns the total number that the endpoint has served the requests.
+//
+// NOTICE: it's thread-safe.
 func (e *Endpoint) Total() int { return int(atomic.LoadUint64(&e.total)) }
 
 // Concurrent returns the number that the endpoint is serving the requests concurrently.
+//
+// NOTICE: it's thread-safe.
 func (e *Endpoint) Concurrent() int { return int(atomic.LoadInt32(&e.concur)) }
 
 // Config returns the configuration information of the endpoint.
+//
+// NOTICE: it's thread-safe.
 func (e *Endpoint) Config() any { return e.config.Load() }
 
 // SetConfig sets the configuration information of the endpoint.
+//
+// NOTICE: it's thread-safe.
 func (e *Endpoint) SetConfig(c any) { e.config.Store(c) }
 
 // Weight returns the weight of the endpoint,
 // which implements the interface Weighter.
+//
+// NOTICE: it's thread-safe.
 func (e *Endpoint) Weight() int { return int(atomic.LoadInt32(&e.weight)) }
 
-// SetWeight resets the weight of the endpoint.
+// SetWeight resets the weight of the endpoint, which is thread-safe.
 //
 // NOTICE: weight must be a positive integer.
 func (e *Endpoint) SetWeight(weight int) {
