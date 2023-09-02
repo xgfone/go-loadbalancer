@@ -43,11 +43,10 @@ func New(name string, b balancer.Balancer, d endpoint.Discovery) *Forwarder {
 		panic("Forwarder.New: the endpoint discovery must not be nil")
 	}
 
-	return &Forwarder{
-		name:      name,
-		balancer:  atomicvalue.NewValue(b),
-		discovery: atomicvalue.NewValue(d),
-	}
+	f := &Forwarder{name: name}
+	f.discovery.Store(d)
+	f.balancer.Store(b)
+	return f
 }
 
 // Name reutrns the name of the forwarder.
@@ -111,7 +110,7 @@ func (f *Forwarder) SwapDiscovery(new endpoint.Discovery) (old endpoint.Discover
 // which will forward the request to one of the backend endpoints.
 func (f *Forwarder) Serve(ctx context.Context, req interface{}) (interface{}, error) {
 	ed := f.GetDiscovery()
-	if ed.Onlen() <= 0 {
+	if ed.Discover().Len() <= 0 {
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	}
 
@@ -128,10 +127,6 @@ func (f *Forwarder) Serve(ctx context.Context, req interface{}) (interface{}, er
 
 var _ endpoint.Discovery = &Forwarder{}
 
-// Onlen return the number of the online endpoints,
-// which implements the interfce endpoint.Discovery#Onlen
-func (f *Forwarder) Onlen() int { return f.GetDiscovery().Onlen() }
-
-// Onlines return all the online endpoints,
-// which implements the inerface endpoint.Discovery#Onlines
-func (f *Forwarder) Onlines() endpoint.Endpoints { return f.GetDiscovery().Onlines() }
+// Discover return all the online endpoints,
+// which implements the inerface endpoint.Discovery#Discover
+func (f *Forwarder) Discover() *endpoint.Static { return f.GetDiscovery().Discover() }

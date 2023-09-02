@@ -45,7 +45,7 @@ func (c Config) ID() string {
 //
 //	*http.Request
 //	interface{ Request() *http.Request }
-func (c Config) NewEndpoint() endpoint.WeightEndpoint {
+func (c Config) NewEndpoint() *endpoint.Endpoint {
 	if c.Host == "" {
 		panic("HttpEndpoint: host must not be empty")
 	}

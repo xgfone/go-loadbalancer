@@ -21,17 +21,19 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
-	"github.com/xgfone/go-loadbalancer/endpoint/extep"
+	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
 func TestBalancer(t *testing.T) {
-	eps := endpoint.Endpoints{
-		extep.NewStateEndpoint(endpoint.Noop("1.2.3.4:8000", 1)),
-		extep.NewStateEndpoint(endpoint.Noop("1.2.3.4:8080", 1)),
-		extep.NewStateEndpoint(endpoint.Noop("5.6.7.8:8000", 1)),
-		extep.NewStateEndpoint(endpoint.Noop("5.6.7.8:8080", 1)),
+	eps := loadbalancer.Endpoints{
+		tests.NewNoopEndpoint("1.2.3.4:8000", 1),
+		tests.NewNoopEndpoint("1.2.3.4:8080", 1),
+		tests.NewNoopEndpoint("5.6.7.8:8000", 1),
+		tests.NewNoopEndpoint("5.6.7.8:8080", 1),
 	}
+	discovery := endpoint.NewStatic(eps)
 
 	balancer := NewBalancer("chash_ip", func(req interface{}) int {
 		ip, _, err := net.SplitHostPort(req.(*http.Request).URL.Host)
@@ -43,16 +45,16 @@ func TestBalancer(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1:80", nil)
 	for i := 0; i < 8; i++ {
-		_, err := balancer.Forward(context.TODO(), req, eps)
+		_, err := balancer.Forward(context.TODO(), req, discovery)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	var num int
-	counts := make([]uint64, len(eps))
+	counts := make([]int, len(eps))
 	for i := 0; i < len(eps); i++ {
-		total := extep.GetState(eps[i]).Total
+		total := eps[i].(*endpoint.Endpoint).Total()
 		counts[i] = total
 		if total > 0 {
 			num++

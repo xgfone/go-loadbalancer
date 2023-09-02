@@ -37,14 +37,14 @@ func NewBalancer(policy string) *Balancer {
 
 // Forward forwards the request to one of the backend endpoints.
 func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
-	eps := sd.Onlines()
-	switch _len := len(eps); _len {
+	eps := sd.Discover()
+	switch _len := len(eps.Endpoints); _len {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
-		return eps[0].Serve(c, r)
+		return eps.Endpoints[0].Serve(c, r)
 	default:
-		return eps[random(_len)].Serve(c, r)
+		return eps.Endpoints[random(_len)].Serve(c, r)
 	}
 }
 
@@ -61,27 +61,27 @@ func NewWeightedBalancer(policy string) *WeightedBalancer {
 
 // Forward forwards the request to one of the backend endpoints.
 func (b *WeightedBalancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
-	eps := sd.Onlines()
-	_len := len(eps)
+	eps := sd.Discover()
+	_len := len(eps.Endpoints)
 	switch _len {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
-		return eps[0].Serve(c, r)
+		return eps.Endpoints[0].Serve(c, r)
 	}
 
 	var total int
 	for i := 0; i < _len; i++ {
-		total += endpoint.GetWeight(eps[i])
+		total += endpoint.GetWeight(eps.Endpoints[i])
 	}
 
 	pos := random(total)
 	for {
 		var total int
 		for i := 0; i < _len; i++ {
-			total += endpoint.GetWeight(eps[i])
+			total += endpoint.GetWeight(eps.Endpoints[i])
 			if pos <= total {
-				return eps[i].Serve(c, r)
+				return eps.Endpoints[i].Serve(c, r)
 			}
 		}
 		pos %= total

@@ -14,15 +14,19 @@
 
 package endpoint
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/xgfone/go-loadbalancer"
+)
 
 var (
-	eppool4   = sync.Pool{New: func() any { return &Static{make(Endpoints, 0, 4)} }}
-	eppool8   = sync.Pool{New: func() any { return &Static{make(Endpoints, 0, 8)} }}
-	eppool16  = sync.Pool{New: func() any { return &Static{make(Endpoints, 0, 16)} }}
-	eppool32  = sync.Pool{New: func() any { return &Static{make(Endpoints, 0, 32)} }}
-	eppool64  = sync.Pool{New: func() any { return &Static{make(Endpoints, 0, 64)} }}
-	eppool128 = sync.Pool{New: func() any { return &Static{make(Endpoints, 0, 128)} }}
+	eppool4   = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 4)} }}
+	eppool8   = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 8)} }}
+	eppool16  = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 16)} }}
+	eppool32  = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 32)} }}
+	eppool64  = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 64)} }}
+	eppool128 = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 128)} }}
 )
 
 // Acquire acquires a preallocated zero-length endpoints from the pool.
@@ -50,7 +54,7 @@ func Acquire(expectedMaxCap int) *Static {
 
 // Release releases the static endpoints back into the pool.
 func Release(eps *Static) {
-	if eps == nil || len(eps.Endpoints) == 0 {
+	if eps == nil || cap(eps.Endpoints) == 0 {
 		return
 	}
 

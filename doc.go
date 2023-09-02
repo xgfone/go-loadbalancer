@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package extep provides some extended functions of the endpoint.
-package extep
+// Package loadbalancer provides some common functions.
+package loadbalancer

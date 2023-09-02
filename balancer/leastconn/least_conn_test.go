@@ -18,33 +18,34 @@ import (
 	"context"
 	"testing"
 
+	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
-	"github.com/xgfone/go-loadbalancer/endpoint/extep"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
 func BenchmarkLeastConn(b *testing.B) {
-	tests.BenchBalancer(b, NewBalancer(""))
+	tests.BenchBalancer(b, NewBalancer("", nil))
 }
 
 func TestLeastConn(t *testing.T) {
-	ep1 := extep.NewStateEndpoint(endpoint.Noop("127.0.0.1", 1))
-	ep2 := extep.NewStateEndpoint(endpoint.Noop("127.0.0.2", 2))
-	ep3 := extep.NewStateEndpoint(endpoint.Noop("127.0.0.3", 3))
-	eps := endpoint.Endpoints{ep1, ep2, ep3}
+	ep1 := tests.NewNoopEndpoint("127.0.0.1", 1)
+	ep2 := tests.NewNoopEndpoint("127.0.0.2", 2)
+	ep3 := tests.NewNoopEndpoint("127.0.0.3", 3)
+	eps := loadbalancer.Endpoints{ep1, ep2, ep3}
+	discovery := endpoint.NewStatic(eps)
 
-	balancer := NewBalancer("")
+	balancer := NewBalancer("", nil)
 	for i := 0; i < 10; i++ {
-		_, _ = balancer.Forward(context.Background(), nil, eps)
+		_, _ = balancer.Forward(context.Background(), nil, discovery)
 	}
 
-	if state := extep.GetState(ep1); state.Total != 10 {
-		t.Errorf("expect %d endpoint1, but got %d", 10, state.Total)
+	if total := ep1.Total(); total != 10 {
+		t.Errorf("expect %d endpoint1, but got %d", 10, total)
 	}
-	if state := extep.GetState(ep2); state.Total != 0 {
-		t.Errorf("expect %d endpoint2, but got %d", 0, state.Total)
+	if total := ep2.Total(); total != 0 {
+		t.Errorf("expect %d endpoint2, but got %d", 0, total)
 	}
-	if state := extep.GetState(ep3); state.Total != 0 {
-		t.Errorf("expect %d endpoint3, but got %d", 0, state.Total)
+	if total := ep3.Total(); total != 0 {
+		t.Errorf("expect %d endpoint3, but got %d", 0, total)
 	}
 }

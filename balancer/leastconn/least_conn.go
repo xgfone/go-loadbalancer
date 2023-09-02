@@ -17,30 +17,46 @@ package leastconn
 
 import (
 	"context"
-	"sort"
+	"slices"
 	"sync"
 
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
-	"github.com/xgfone/go-loadbalancer/endpoint/extep"
 )
 
-// Balancer implements the balancer based on the least number of the connection.
+// Concurrenter is used to return the concurrent number of an endpoint.
+type Concurrenter interface {
+	Concurrent() int
+}
+
+// GetConcurrency is the default function to get the concurrency number of the endpoint.
 //
-// NOTICE: the endpoint must have implemented the interface extep.StateEndpoint.
+// For the default implementation, check whether the endpoint has implemented
+// the interface Concurrenter and call it. Or, return 0.
+var GetConcurrency func(loadbalancer.Endpoint) int = func(e loadbalancer.Endpoint) int {
+	if c, ok := e.(Concurrenter); ok {
+		return c.Concurrent()
+	}
+	return 0
+}
+
+// Balancer implements the balancer based on the least number of the connection.
 type Balancer struct {
 	policy string
-	lock   sync.Mutex
+	getcon func(loadbalancer.Endpoint) int
+
+	lock sync.Mutex
 }
 
 // NewBalancer returns a new balancer based on the random with the policy name.
 //
 // If policy is empty, use "least_conn" instead.
-func NewBalancer(policy string) *Balancer {
+// If getconcurrency is nil, use GetConcurrency instead.
+func NewBalancer(policy string, getconcurrency func(loadbalancer.Endpoint) int) *Balancer {
 	if policy == "" {
 		policy = "least_conn"
 	}
-	return &Balancer{policy: policy}
+	return &Balancer{policy: policy, getcon: getconcurrency}
 }
 
 // Policy returns the policy of the balancer.
@@ -48,31 +64,31 @@ func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
 func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
-	switch eps := sd.Onlines(); len(eps) {
+	switch eps := sd.Discover(); len(eps.Endpoints) {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
-		return eps[0].Serve(c, r)
+		return eps.Endpoints[0].Serve(c, r)
 	default:
-		return b.selectEndpoint(eps).Serve(c, r)
+		return b.selectEndpoint(eps.Endpoints).Serve(c, r)
 	}
 }
 
-func (b *Balancer) selectEndpoint(eps endpoint.Endpoints) endpoint.Endpoint {
+func (b *Balancer) selectEndpoint(eps loadbalancer.Endpoints) loadbalancer.Endpoint {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	w := endpoint.Acquire(len(eps))
 	w.Endpoints = append(w.Endpoints, eps...)
-	sort.Stable(leastConnEndpoints(w.Endpoints))
+	b.sort(w.Endpoints)
 	ep := w.Endpoints[0]
 	endpoint.Release(w)
 	return ep
 }
 
-type leastConnEndpoints endpoint.Endpoints
-
-func (eps leastConnEndpoints) Len() int      { return len(eps) }
-func (eps leastConnEndpoints) Swap(i, j int) { eps[i], eps[j] = eps[j], eps[i] }
-func (eps leastConnEndpoints) Less(i, j int) bool {
-	return extep.GetState(eps[i]).Current < extep.GetState(eps[j]).Current
+func (b *Balancer) sort(eps loadbalancer.Endpoints) {
+	get := b.getcon
+	if get == nil {
+		get = GetConcurrency
+	}
+	slices.SortFunc(eps, func(a, b loadbalancer.Endpoint) int { return get(a) - get(b) })
 }

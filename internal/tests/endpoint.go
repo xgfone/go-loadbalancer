@@ -12,5 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package endpoint provides some endpoint auxiliary functions.
-package endpoint
+package tests
+
+import (
+	"context"
+
+	"github.com/xgfone/go-loadbalancer/endpoint"
+)
+
+func noop(context.Context, interface{}) (interface{}, error) { return nil, nil }
+
+// NewNoopEndpoint returns an endpoint that do nothing.
+func NewNoopEndpoint(id string, weight int) *endpoint.Endpoint {
+	return endpoint.New(id, weight, noop)
+}

@@ -22,10 +22,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer/retry"
 	"github.com/xgfone/go-loadbalancer/balancer/roundrobin"
 	"github.com/xgfone/go-loadbalancer/endpoint"
-	"github.com/xgfone/go-loadbalancer/endpoint/extep"
 	httpep "github.com/xgfone/go-loadbalancer/http/endpoint"
 )
 
@@ -36,22 +36,19 @@ func testHandler(key string) http.Handler {
 }
 
 func TestLoadBalancer(t *testing.T) {
-	ep1 := extep.NewStateEndpoint(httpep.Config{
+	ep1 := httpep.Config{
 		Host:   "127.0.0.1",
 		Port:   8101,
 		Weight: 1,
-	}.NewEndpoint())
+	}.NewEndpoint()
 
-	ep2 := extep.NewStateEndpoint(httpep.Config{
+	ep2 := httpep.Config{
 		Host:   "127.0.0.1",
 		Port:   8102,
 		Weight: 2,
-	}.NewEndpoint())
+	}.NewEndpoint()
 
-	discovery := &endpoint.Static{
-		Endpoints: endpoint.Endpoints{ep1, ep2},
-	}
-
+	discovery := endpoint.NewStatic(loadbalancer.Endpoints{ep1, ep2})
 	forwarder := New("test", retry.New(roundrobin.NewBalancer(""), 0, 0), discovery)
 
 	go func() {
@@ -91,11 +88,7 @@ func TestLoadBalancer(t *testing.T) {
 		}
 	}
 
-	state := ep1.State()
-	if state.Total != 2 {
-		t.Errorf("expect %d total requests, but got %d", 2, state.Total)
-	}
-	if state.Failure != 0 {
-		t.Errorf("expect %d failure requests, but got %d", 0, state.Failure)
+	if total := ep1.Total(); total != 2 {
+		t.Errorf("expect %d total requests, but got %d", 2, total)
 	}
 }

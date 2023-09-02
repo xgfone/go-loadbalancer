@@ -31,7 +31,7 @@ func init() {
 	RegisterBalancer(roundrobin.NewBalancer(""))
 	RegisterBalancer(roundrobin.NewWeightedBalancer(""))
 	RegisterBalancer(sourceiphash.NewBalancer(""))
-	RegisterBalancer(leastconn.NewBalancer(""))
+	RegisterBalancer(leastconn.NewBalancer("", nil))
 }
 
 // Builder is used to build a new Balancer with the config.

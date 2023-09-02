@@ -47,15 +47,15 @@ func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
 func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
-	eps := sd.Onlines()
-	switch _len := len(eps); _len {
+	eps := sd.Discover()
+	switch _len := len(eps.Endpoints); _len {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
-		return eps[0].Serve(c, r)
+		return eps.Endpoints[0].Serve(c, r)
 	default:
 		pos := atomic.AddUint64(&b.last, 1)
-		return eps[pos%uint64(_len)].Serve(c, r)
+		return eps.Endpoints[pos%uint64(_len)].Serve(c, r)
 	}
 }
 
@@ -88,18 +88,18 @@ func (b *WeightedBalancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
 func (b *WeightedBalancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
-	eps := sd.Onlines()
-	switch len(eps) {
+	eps := sd.Discover()
+	switch len(eps.Endpoints) {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
-		return eps[0].Serve(c, r)
+		return eps.Endpoints[0].Serve(c, r)
 	default:
-		return b.selectNextEndpoint(eps).Serve(c, r)
+		return b.selectNextEndpoint(eps.Endpoints).Serve(c, r)
 	}
 }
 
-func (b *WeightedBalancer) selectNextEndpoint(eps endpoint.Endpoints) endpoint.Endpoint {
+func (b *WeightedBalancer) selectNextEndpoint(eps loadbalancer.Endpoints) loadbalancer.Endpoint {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -138,6 +138,6 @@ func (b *WeightedBalancer) selectNextEndpoint(eps endpoint.Endpoints) endpoint.E
 }
 
 type weightedEndpoint struct {
-	endpoint.Endpoint
+	loadbalancer.Endpoint
 	CurrentWeight int
 }

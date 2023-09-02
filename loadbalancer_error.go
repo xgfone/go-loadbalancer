@@ -1,4 +1,4 @@
-// Copyright 2021~2023 xgfone
+// Copyright 2023 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package loadbalancer provides some common functions.
 package loadbalancer
 
 import "errors"
@@ -27,7 +26,7 @@ type RetryError interface {
 }
 
 // NewRetryError returns a new retry error, but returns nil instead if err is nil.
-func NewRetryError(retry bool, err error) error {
+func NewRetryError(retry bool, err error) RetryError {
 	if err == nil {
 		return nil
 	}

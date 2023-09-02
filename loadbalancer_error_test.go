@@ -18,7 +18,8 @@ package loadbalancer
 import "testing"
 
 func TestNewError(t *testing.T) {
-	if err := NewRetryError(true, nil); err != nil {
+	var err error
+	if err = NewRetryError(true, nil); err != nil {
 		t.Errorf("expect nil, but got %v", err)
 	}
 

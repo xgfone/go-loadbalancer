@@ -19,8 +19,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/endpoint"
-	"github.com/xgfone/go-loadbalancer/endpoint/extep"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
@@ -29,10 +29,11 @@ func BenchmarkSourceIPHash(b *testing.B) {
 }
 
 func TestSourceIPHash(t *testing.T) {
-	ep1 := extep.NewStateEndpoint(endpoint.Noop("127.0.0.1", 1))
-	ep2 := extep.NewStateEndpoint(endpoint.Noop("127.0.0.2", 2))
-	ep3 := extep.NewStateEndpoint(endpoint.Noop("127.0.0.3", 3))
-	eps := endpoint.Endpoints{ep1, ep2, ep3}
+	ep1 := tests.NewNoopEndpoint("127.0.0.1", 1)
+	ep2 := tests.NewNoopEndpoint("127.0.0.2", 2)
+	ep3 := tests.NewNoopEndpoint("127.0.0.3", 3)
+	eps := loadbalancer.Endpoints{ep1, ep2, ep3}
+	discovery := endpoint.NewStatic(eps)
 
 	req1, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
 	req2, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
@@ -42,22 +43,22 @@ func TestSourceIPHash(t *testing.T) {
 	req3.RemoteAddr = "192.168.0.2"
 
 	balancer := NewBalancer("")
-	_, _ = balancer.Forward(context.Background(), req1, eps)
-	_, _ = balancer.Forward(context.Background(), req1, eps)
-	_, _ = balancer.Forward(context.Background(), req1, eps)
-	_, _ = balancer.Forward(context.Background(), req1, eps)
-	_, _ = balancer.Forward(context.Background(), req1, eps)
-	_, _ = balancer.Forward(context.Background(), req1, eps)
-	_, _ = balancer.Forward(context.Background(), req2, eps)
-	_, _ = balancer.Forward(context.Background(), req3, eps)
+	_, _ = balancer.Forward(context.Background(), req1, discovery)
+	_, _ = balancer.Forward(context.Background(), req1, discovery)
+	_, _ = balancer.Forward(context.Background(), req1, discovery)
+	_, _ = balancer.Forward(context.Background(), req1, discovery)
+	_, _ = balancer.Forward(context.Background(), req1, discovery)
+	_, _ = balancer.Forward(context.Background(), req1, discovery)
+	_, _ = balancer.Forward(context.Background(), req2, discovery)
+	_, _ = balancer.Forward(context.Background(), req3, discovery)
 
-	if total := extep.GetState(ep1).Total; total != 6 {
+	if total := ep1.Total(); total != 6 {
 		t.Errorf("expect %d endpoint1, but got %d", 6, total)
 	}
-	if total := extep.GetState(ep2).Total; total != 1 {
+	if total := ep2.Total(); total != 1 {
 		t.Errorf("expect %d endpoint2, but got %d", 1, total)
 	}
-	if total := extep.GetState(ep3).Total; total != 1 {
+	if total := ep3.Total(); total != 1 {
 		t.Errorf("expect %d endpoint3, but got %d", 1, total)
 	}
 }

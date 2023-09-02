@@ -12,20 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package endpoint
+package endpoint_test
 
-import "testing"
+import (
+	"testing"
 
-func TestEndpoints(t *testing.T) {
-	ep1 := Noop("192.168.1.1", 1)
-	ep2 := Noop("192.168.1.2", 1)
-	ep3 := Noop("192.168.1.3", 3)
-	ep4 := Noop("192.168.1.4", 3)
-	ep5 := Noop("192.168.1.5", 2)
-	ep6 := Noop("192.168.1.6", 2)
+	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/endpoint"
+	"github.com/xgfone/go-loadbalancer/internal/tests"
+)
 
-	eps := Endpoints{ep1, ep2, ep3, ep4, ep5, ep6}
-	Sort(eps)
+func TestSortEndpoints(t *testing.T) {
+	ep1 := tests.NewNoopEndpoint("192.168.1.1", 1)
+	ep2 := tests.NewNoopEndpoint("192.168.1.2", 1)
+	ep3 := tests.NewNoopEndpoint("192.168.1.3", 3)
+	ep4 := tests.NewNoopEndpoint("192.168.1.4", 3)
+	ep5 := tests.NewNoopEndpoint("192.168.1.5", 2)
+	ep6 := tests.NewNoopEndpoint("192.168.1.6", 2)
+
+	eps := loadbalancer.Endpoints{ep1, ep2, ep3, ep4, ep5, ep6}
+	endpoint.Sort(eps)
 
 	expects := []string{
 		"192.168.1.1", "192.168.1.2",

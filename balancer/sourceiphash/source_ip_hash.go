@@ -57,13 +57,13 @@ func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
 func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
-	eps := sd.Onlines()
-	_len := len(eps)
+	eps := sd.Discover()
+	_len := len(eps.Endpoints)
 	switch _len {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
-		return eps[0].Serve(c, r)
+		return eps.Endpoints[0].Serve(c, r)
 	}
 
 	var err error
@@ -95,5 +95,5 @@ func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discove
 		value = uint64(random(_len))
 	}
 
-	return eps[value%uint64(_len)].Serve(c, r)
+	return eps.Endpoints[value%uint64(_len)].Serve(c, r)
 }

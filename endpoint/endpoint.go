@@ -12,81 +12,90 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package endpoint provides some auxiliary functions about endpoint.
 package endpoint
 
 import (
 	"context"
 	"sort"
+	"sync/atomic"
+
+	"github.com/xgfone/go-loadbalancer"
 )
 
-// Endpoint represents a backend endpoint.
-type Endpoint interface {
-	ID() string
+// Endpoint is a common endpoint implementation.
+type Endpoint struct {
+	id    string
+	serve loadbalancer.ServeFunc
 
-	Serve(ctx context.Context, req interface{}) (resp interface{}, err error)
+	total  uint64
+	concur int32
+	weight int32
 }
 
-// Unwrapper is used to unwrap the inner endpoint.
-type Unwrapper interface {
-	Unwrap() Endpoint
-}
-
-// Discovery is used to discover the endpoints.
-type Discovery interface {
-	Onlines() Endpoints
-	Onlen() int
-}
-
-// Static is used to wrap the endpoints to avoid the memory allocation.
-type Static struct{ Endpoints }
-
-// Onlines implements the interface Discovery#Onlines.
+// New returns a new common endpoint with id, weight and serve function.
 //
-// If s is equal to nil, return nil.
-func (s *Static) Onlines() Endpoints {
-	if s == nil {
-		return nil
+// If weight is equal to or less than 1, use 1 instead.
+func New(id string, weight int, serve loadbalancer.ServeFunc) *Endpoint {
+	if id == "" {
+		panic("endpoint.New: id must not be empty")
 	}
-	return s.Endpoints
+	if serve == nil {
+		panic("endpoint.New: serve function must not be nil")
+	}
+	if weight < 1 {
+		weight = 1
+	}
+
+	e := &Endpoint{id: id, serve: serve}
+	e.SetWeight(weight)
+	return e
 }
 
-// Onlen implements the interface Discovery#Onlen.
+// Serve returns the endpoint id, which implements the interface loadbalancer.Endpoint#ID.
+func (e *Endpoint) ID() string { return e.id }
+
+// String returns the description of the endpoint, which is equal to ID.
+func (e *Endpoint) String() string { return e.id }
+
+// Serve serves the request, which implements the interface loadbalancer.Endpoint#Serve.
+func (e *Endpoint) Serve(c context.Context, r interface{}) (interface{}, error) {
+	e.inc()
+	defer e.dec()
+	return e.serve(c, r)
+}
+
+func (e *Endpoint) inc() {
+	atomic.AddUint64(&e.total, 1)
+	atomic.AddInt32(&e.concur, 1)
+}
+
+func (e *Endpoint) dec() { atomic.AddInt32(&e.concur, -1) }
+
+// Total returns the total number that the endpoint has served the requests.
+func (e *Endpoint) Total() int { return int(atomic.LoadUint64(&e.total)) }
+
+// Concurrent returns the number that the endpoint is serving the requests concurrently.
+func (e *Endpoint) Concurrent() int { return int(atomic.LoadInt32(&e.concur)) }
+
+// Weight returns the weight of the endpoint,
+// which implements the interface Weighter.
+func (e *Endpoint) Weight() int { return int(atomic.LoadInt32(&e.weight)) }
+
+// SetWeight resets the weight of the endpoint.
 //
-// If s is equal to nil, return 0.
-func (s *Static) Onlen() int {
-	if s == nil {
-		return 0
+// NOTICE: weight must be a positive integer.
+func (e *Endpoint) SetWeight(weight int) {
+	if weight <= 0 {
+		panic("Endpoint.SetWeight: weight must be a positive integer")
 	}
-	return len(s.Endpoints)
+	atomic.StoreInt32(&e.weight, int32(weight))
 }
 
-var (
-	_ Discovery = Endpoints(nil)
-	_ Discovery = new(Static)
-)
+var _ Weighter = new(Endpoint)
 
-// Endpoints represents a group of the endpoints.
-type Endpoints []Endpoint
-
-// Onlen return the number of all the endpoints,
-// which implements the interface Discovery#Onlen,
-func (eps Endpoints) Onlen() (n int) { return len(eps) }
-
-// Onlines returns itself, which implements the interface Discovery#Onlines.
-func (eps Endpoints) Onlines() Endpoints { return eps }
-
-// Contains reports whether the endpoints contains the endpoint indicated by the id.
-func (eps Endpoints) Contains(epid string) bool {
-	for _, s := range eps {
-		if s.ID() == epid {
-			return true
-		}
-	}
-	return false
-}
-
-// Sort sorts the endpoints by the ASC order..
-func Sort(eps Endpoints) {
+// SortEndpoints sorts the endpoints by the ASC order..
+func Sort(eps loadbalancer.Endpoints) {
 	if len(eps) == 0 {
 		return
 	}
@@ -102,60 +111,3 @@ func Sort(eps Endpoints) {
 		}
 	})
 }
-
-// WeightEndpoint represents a backend endpoint with the weight.
-type WeightEndpoint interface {
-	// Weight returns the weight of the endpoint, which must be a positive integer.
-	//
-	// The bigger the value, the higher the weight.
-	Weight() int
-
-	Endpoint
-}
-
-// GetWeight returns the weight of the endpoint if it has implements
-// the interface WeightEndpoint. Or, check whether it has implemented
-// the interface Unwrapper and unwrap it.
-// If still failing, return 1 instead.
-func GetWeight(ep Endpoint) int {
-	switch s := ep.(type) {
-	case WeightEndpoint:
-		if weight := s.Weight(); weight > 0 {
-			return weight
-		}
-		return 1
-
-	case interface{ Unwrap() Endpoint }:
-		return GetWeight(s.Unwrap())
-
-	default:
-		return 1
-	}
-}
-
-// ServeFunc is the endpoint serve function.
-type ServeFunc func(context.Context, interface{}) (interface{}, error)
-
-func noop(ctx context.Context, i interface{}) (interface{}, error) { return nil, nil }
-
-// Noop returns a new weight endpoint that does nothing.
-func Noop(id string, weight int) WeightEndpoint { return New(id, weight, noop) }
-
-// New returns a new weight endpoint with the id and serve function.
-func New(id string, weight int, serve ServeFunc) WeightEndpoint {
-	if weight < 1 {
-		weight = 1
-	}
-	return &endpoint{sf: serve, id: id, w: weight}
-}
-
-type endpoint struct {
-	sf ServeFunc
-	id string
-	w  int
-}
-
-func (ep *endpoint) ID() string                                                  { return ep.id }
-func (ep *endpoint) Weight() int                                                 { return ep.w }
-func (ep *endpoint) String() string                                              { return ep.id }
-func (ep *endpoint) Serve(c context.Context, r interface{}) (interface{}, error) { return ep.sf(c, r) }

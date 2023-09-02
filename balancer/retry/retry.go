@@ -45,13 +45,13 @@ func New(balancer balancer.Balancer, interval time.Duration, maxNum int) Retry {
 
 // Forward overrides the Forward method.
 func (b Retry) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (resp interface{}, err error) {
-	eps := sd.Onlines()
-	_len := len(eps)
+	eps := sd.Discover()
+	_len := len(eps.Endpoints)
 	switch _len {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
-		return eps[0].Serve(c, r)
+		return eps.Endpoints[0].Serve(c, r)
 	}
 
 	if b.MaxNumber > 0 && b.MaxNumber < _len {
