@@ -35,7 +35,7 @@ func TestBalancer(t *testing.T) {
 	}
 	discovery := endpoint.NewStatic(eps)
 
-	balancer := NewBalancer("chash_ip", func(req interface{}) int {
+	balancer := NewBalancer("chash_ip", func(req any) int {
 		ip, _, err := net.SplitHostPort(req.(*http.Request).URL.Host)
 		if err != nil {
 			panic(err)

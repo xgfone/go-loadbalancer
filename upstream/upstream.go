@@ -55,7 +55,7 @@ func SetDiscovery(discovery endpoint.Discovery) Option {
 }
 
 // SetContextData returns an upstream option to set the context data.
-func SetContextData(contextData interface{}) Option {
+func SetContextData(contextData any) Option {
 	return func(u *Upstream) { u.SetContextData(contextData) }
 }
 
@@ -79,7 +79,7 @@ func UpdateForwarder(f func(*forwarder.Forwarder)) Option {
 // Upstream represents an upstream to manage the backend endpoints.
 type Upstream struct {
 	forwarder *forwarder.Forwarder
-	context   atomicvalue.Value[interface{}]
+	context   atomicvalue.Value[any]
 }
 
 var defaultDiscovery = new(endpoint.Static)
@@ -102,7 +102,7 @@ func (up *Upstream) Name() string { return up.forwarder.Name() }
 func (up *Upstream) Policy() string { return up.forwarder.GetBalancer().Policy() }
 
 // ContextData returns the context data of the upstream.
-func (up *Upstream) ContextData() interface{} { return up.context.Load() }
+func (up *Upstream) ContextData() any { return up.context.Load() }
 
 // Endpoints returns the endpoint discovery.
 func (up *Upstream) Discovery() endpoint.Discovery { return up.forwarder.GetDiscovery() }
@@ -124,7 +124,7 @@ func (up *Upstream) Options() []Option {
 }
 
 // SetContextData sets the context data.
-func (up *Upstream) SetContextData(contextData interface{}) {
+func (up *Upstream) SetContextData(contextData any) {
 	up.context.Store(contextData)
 }
 

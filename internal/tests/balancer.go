@@ -24,7 +24,7 @@ import (
 )
 
 type forwarder interface {
-	Forward(context.Context, interface{}, endpoint.Discovery) (interface{}, error)
+	Forward(context.Context, any, endpoint.Discovery) (any, error)
 }
 
 // BenchBalancer benchmarks the forwarder.

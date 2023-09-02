@@ -17,7 +17,7 @@ package processor
 import "fmt"
 
 // Builder is used to build a processor by the directive and arguments.
-type Builder func(directive string, args ...interface{}) (Processor, error)
+type Builder func(directive string, args ...any) (Processor, error)
 
 // BuilderManager is used to manage a set of the processor builders.
 type BuilderManager struct {
@@ -63,7 +63,7 @@ func (m *BuilderManager) AllDirectives() []string {
 }
 
 // Build is a convenient function to build a new directive for directive.
-func (m *BuilderManager) Build(directive string, args ...interface{}) (processor Processor, err error) {
+func (m *BuilderManager) Build(directive string, args ...any) (processor Processor, err error) {
 	if builder := m.Get(directive); builder == nil {
 		err = fmt.Errorf("no the processor builder for the directive '%s'", directive)
 	} else if processor, err = builder(directive, args...); err == nil && processor == nil {

@@ -25,12 +25,12 @@ import (
 // Balancer implements the balancer based on the consistent hash.
 type Balancer struct {
 	policy string
-	hash   func(req interface{}) int
+	hash   func(req any) int
 }
 
 // NewBalancer returns a new balancer based on the consistent hash
 // with the policy name.
-func NewBalancer(policy string, hash func(req interface{}) int) *Balancer {
+func NewBalancer(policy string, hash func(req any) int) *Balancer {
 	if policy == "" {
 		panic("consistenthash: policy name must not be empty")
 	}
@@ -44,7 +44,7 @@ func NewBalancer(policy string, hash func(req interface{}) int) *Balancer {
 func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
+func (b *Balancer) Forward(c context.Context, r any, sd endpoint.Discovery) (any, error) {
 	eps := sd.Discover()
 	switch _len := len(eps.Endpoints); _len {
 	case 0:

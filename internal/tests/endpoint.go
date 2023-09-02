@@ -20,7 +20,7 @@ import (
 	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
-func noop(context.Context, interface{}) (interface{}, error) { return nil, nil }
+func noop(context.Context, any) (any, error) { return nil, nil }
 
 // NewNoopEndpoint returns an endpoint that do nothing.
 func NewNoopEndpoint(id string, weight int) *endpoint.Endpoint {

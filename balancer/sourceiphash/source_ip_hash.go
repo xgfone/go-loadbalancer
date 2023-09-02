@@ -29,14 +29,14 @@ import (
 var random = rand.Intn
 
 // GetSourceIP is the default function to get the source ip of the request.
-var GetSourceIP func(ctx context.Context, req interface{}) (netip.Addr, error)
+var GetSourceIP func(ctx context.Context, req any) (netip.Addr, error)
 
 // Balancer implements the balancer based on the source-ip hash.
 type Balancer struct {
 	// GetSourceAddr is used to get the source address.
 	//
 	// If nil, use GetSourceIP or defaults.GetClientIP insead.
-	GetSourceIP func(ctx context.Context, req interface{}) (netip.Addr, error)
+	GetSourceIP func(ctx context.Context, req any) (netip.Addr, error)
 
 	policy string
 }
@@ -56,7 +56,7 @@ func NewBalancer(policy string) *Balancer {
 func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
+func (b *Balancer) Forward(c context.Context, r any, sd endpoint.Discovery) (any, error) {
 	eps := sd.Discover()
 	_len := len(eps.Endpoints)
 	switch _len {

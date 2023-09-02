@@ -59,7 +59,7 @@ func (e *Endpoint) ID() string { return e.id }
 func (e *Endpoint) String() string { return e.id }
 
 // Serve serves the request, which implements the interface loadbalancer.Endpoint#Serve.
-func (e *Endpoint) Serve(c context.Context, r interface{}) (interface{}, error) {
+func (e *Endpoint) Serve(c context.Context, r any) (any, error) {
 	e.inc()
 	defer e.dec()
 	return e.serve(c, r)

@@ -17,13 +17,13 @@ package loadbalancer
 import "context"
 
 // ServeFunc is the endpoint serve function.
-type ServeFunc func(ctx context.Context, req interface{}) (resp interface{}, err error)
+type ServeFunc func(ctx context.Context, req any) (resp any, err error)
 
 // Endpoint represents a backend endpoint.
 type Endpoint interface {
 	ID() string
 
-	Serve(ctx context.Context, req interface{}) (resp interface{}, err error)
+	Serve(ctx context.Context, req any) (resp any, err error)
 }
 
 // Unwrapper is used to unwrap the inner endpoint.

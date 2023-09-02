@@ -28,7 +28,7 @@ var (
 type (
 	// Context represents a processor context.
 	Context struct {
-		CtxData interface{}
+		CtxData any
 
 		SrcRes http.ResponseWriter
 		SrcReq *http.Request
@@ -48,7 +48,7 @@ type (
 )
 
 // WithContext returns a new processor Context with the context data.
-func (c Context) WithContext(ctxData interface{}) Context {
+func (c Context) WithContext(ctxData any) Context {
 	c.CtxData = ctxData
 	return c
 }

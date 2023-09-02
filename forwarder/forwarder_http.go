@@ -64,7 +64,7 @@ func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // ForwardHTTP is the same as Serve, but just a simple implementation for http
 func (f *Forwarder) ForwardHTTP(ctx context.Context, w http.ResponseWriter,
-	r *http.Request, reqProcessor processor.Processor) (interface{}, error) {
+	r *http.Request, reqProcessor processor.Processor) (any, error) {
 	// 1. Create a new request.
 	req := r.Clone(ctx)
 	req.Close = false

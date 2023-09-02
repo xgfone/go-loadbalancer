@@ -35,7 +35,7 @@ func init() {
 }
 
 // Builder is used to build a new Balancer with the config.
-type Builder func(policy string, config interface{}) (Balancer, error)
+type Builder func(policy string, config any) (Balancer, error)
 
 // RegisterBuidler registers the balancer builder for the given policy.
 //
@@ -59,7 +59,7 @@ func RegisterBuidler(policy string, builder Builder) {
 //	source_ip_hash
 //	least_conn
 func RegisterBalancer(b Balancer) {
-	RegisterBuidler(b.Policy(), func(string, interface{}) (Balancer, error) { return b, nil })
+	RegisterBuidler(b.Policy(), func(string, any) (Balancer, error) { return b, nil })
 }
 
 // GetBuilder returns the registered balancer builder by the policy.
@@ -77,7 +77,7 @@ func GetAllPolicies() []string {
 }
 
 // Build is a convenient function to build a new balancer for policy.
-func Build(policy string, config interface{}) (balancer Balancer, err error) {
+func Build(policy string, config any) (balancer Balancer, err error) {
 	if builder := GetBuilder(policy); builder == nil {
 		err = fmt.Errorf("no the balancer builder for the policy '%s'", policy)
 	} else if balancer, err = builder(policy, config); err == nil && balancer == nil {
@@ -87,7 +87,7 @@ func Build(policy string, config interface{}) (balancer Balancer, err error) {
 }
 
 // Must is equal to Build, but panics if there is an error.
-func Must(policy string, config interface{}) (balancer Balancer) {
+func Must(policy string, config any) (balancer Balancer) {
 	balancer, err := Build(policy, config)
 	if err != nil {
 		panic(err)

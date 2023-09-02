@@ -54,7 +54,7 @@ func (c Config) NewEndpoint() *endpoint.Endpoint {
 	}
 
 	host := c.ID()
-	return endpoint.New(host, c.Weight, func(c context.Context, i interface{}) (interface{}, error) {
+	return endpoint.New(host, c.Weight, func(c context.Context, i any) (any, error) {
 		var req *http.Request
 		switch r := i.(type) {
 		case *http.Request:

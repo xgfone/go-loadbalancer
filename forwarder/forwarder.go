@@ -108,7 +108,7 @@ func (f *Forwarder) SwapDiscovery(new endpoint.Discovery) (old endpoint.Discover
 
 // Serve implement the interface endpoint.Endpoint#Serve,
 // which will forward the request to one of the backend endpoints.
-func (f *Forwarder) Serve(ctx context.Context, req interface{}) (interface{}, error) {
+func (f *Forwarder) Serve(ctx context.Context, req any) (any, error) {
 	ed := f.GetDiscovery()
 	if ed.Discover().Len() <= 0 {
 		return nil, loadbalancer.ErrNoAvailableEndpoints

@@ -63,7 +63,7 @@ func NewBalancer(policy string, getconcurrency func(loadbalancer.Endpoint) int) 
 func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *Balancer) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (interface{}, error) {
+func (b *Balancer) Forward(c context.Context, r any, sd endpoint.Discovery) (any, error) {
 	switch eps := sd.Discover(); len(eps.Endpoints) {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints

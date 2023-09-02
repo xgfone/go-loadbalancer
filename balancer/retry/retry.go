@@ -44,7 +44,7 @@ func New(balancer balancer.Balancer, interval time.Duration, maxNum int) Retry {
 }
 
 // Forward overrides the Forward method.
-func (b Retry) Forward(c context.Context, r interface{}, sd endpoint.Discovery) (resp interface{}, err error) {
+func (b Retry) Forward(c context.Context, r any, sd endpoint.Discovery) (resp any, err error) {
 	eps := sd.Discover()
 	_len := len(eps.Endpoints)
 	switch _len {
