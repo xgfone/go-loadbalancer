@@ -54,22 +54,28 @@ func (c Config) NewEndpoint() *endpoint.Endpoint {
 	}
 
 	host := c.ID()
-	return endpoint.New(host, c.Weight, func(c context.Context, i any) (any, error) {
-		var req *http.Request
-		switch r := i.(type) {
-		case *http.Request:
-			req = r
-		case interface{ Request() *http.Request }:
-			req = r.Request()
-		default:
-			panic(fmt.Errorf("HttpEndpoint: unknown request type %T", i))
-		}
+	e := endpoint.New(host, server(host).serve)
+	e.SetWeight(c.Weight)
+	return e
+}
 
-		req.URL.Host = host
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil && resp != nil {
-			resp.Body.Close() // For status code 3xx
-		}
-		return resp, err
-	})
+type server string
+
+func (s server) serve(c context.Context, r any) (any, error) {
+	var req *http.Request
+	switch t := r.(type) {
+	case *http.Request:
+		req = t
+	case interface{ Request() *http.Request }:
+		req = t.Request()
+	default:
+		panic(fmt.Errorf("HttpEndpoint: unknown request type %T", r))
+	}
+
+	req.URL.Host = string(s)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil && resp != nil {
+		resp.Body.Close() // For status code 3xx
+	}
+	return resp, err
 }

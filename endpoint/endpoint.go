@@ -36,21 +36,16 @@ type Endpoint struct {
 }
 
 // New returns a new common endpoint with id, weight and serve function.
-//
-// If weight is equal to or less than 1, use 1 instead.
-func New(id string, weight int, serve loadbalancer.ServeFunc) *Endpoint {
+func New(id string, serve loadbalancer.ServeFunc) *Endpoint {
 	if id == "" {
 		panic("endpoint.New: id must not be empty")
 	}
 	if serve == nil {
 		panic("endpoint.New: serve function must not be nil")
 	}
-	if weight < 1 {
-		weight = 1
-	}
 
 	e := &Endpoint{id: id, serve: serve}
-	e.SetWeight(weight)
+	e.SetWeight(1)
 	return e
 }
 

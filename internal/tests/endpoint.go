@@ -24,5 +24,7 @@ func noop(context.Context, any) (any, error) { return nil, nil }
 
 // NewNoopEndpoint returns an endpoint that do nothing.
 func NewNoopEndpoint(id string, weight int) *endpoint.Endpoint {
-	return endpoint.New(id, weight, noop)
+	e := endpoint.New(id, noop)
+	e.SetWeight(weight)
+	return e
 }
