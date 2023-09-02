@@ -20,6 +20,7 @@ import (
 	"sort"
 	"sync/atomic"
 
+	"github.com/xgfone/go-atomicvalue"
 	"github.com/xgfone/go-loadbalancer"
 )
 
@@ -31,6 +32,7 @@ type Endpoint struct {
 	total  uint64
 	concur int32
 	weight int32
+	config atomicvalue.Value[any]
 }
 
 // New returns a new common endpoint with id, weight and serve function.
@@ -77,6 +79,12 @@ func (e *Endpoint) Total() int { return int(atomic.LoadUint64(&e.total)) }
 
 // Concurrent returns the number that the endpoint is serving the requests concurrently.
 func (e *Endpoint) Concurrent() int { return int(atomic.LoadInt32(&e.concur)) }
+
+// Config returns the configuration information of the endpoint.
+func (e *Endpoint) Config() any { return e.config.Load() }
+
+// SetConfig sets the configuration information of the endpoint.
+func (e *Endpoint) SetConfig(c any) { e.config.Store(c) }
 
 // Weight returns the weight of the endpoint,
 // which implements the interface Weighter.
