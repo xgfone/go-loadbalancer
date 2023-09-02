@@ -55,8 +55,7 @@ func NewManager(initcap int) *Manager {
 
 var _ Discovery = new(Manager)
 
-// Discover returns all the online endpoints.
-// which implements the interface Discovery#Discover,
+// Discover returns all the online endpoints, which implements the interface Discovery.
 func (m *Manager) Discover() *Static { return m.oneps.Load() }
 
 // All returns all the endpoints with the online status.

@@ -34,8 +34,7 @@ func NewStatic(eps loadbalancer.Endpoints) *Static {
 	return &Static{Endpoints: eps}
 }
 
-// Discover returns itself,
-// which implements the interface Discovery#Discover.
+// Discover returns itself, which implements the interface Discovery.
 func (s *Static) Discover() *Static { return s }
 
 // Len returns the number of the endpoints.
