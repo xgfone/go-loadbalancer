@@ -28,7 +28,7 @@ import (
 )
 
 // DefaultHealthChecker is the default global health checker.
-var DefaultHealthChecker = NewHealthChecker("default")
+var DefaultHealthChecker = New("default")
 
 // DefaultConfig is the default configuration of the checker.
 var DefaultConfig = Config{Failure: 2, Timeout: time.Second, Interval: time.Second * 10}
@@ -112,8 +112,8 @@ type HealthChecker struct {
 	cconfig atomicvalue.Value[cconfig]
 }
 
-// NewHealthChecker returns a new health checker.
-func NewHealthChecker(name string) *HealthChecker {
+// New returns a new health checker.
+func New(name string) *HealthChecker {
 	return &HealthChecker{
 		name:    name,
 		maps:    make(map[string]*_checker, 16),

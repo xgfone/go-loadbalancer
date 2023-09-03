@@ -24,7 +24,7 @@ import (
 func TestHealthCheck(t *testing.T) {
 	num := new(atomic.Int32)
 
-	hc := NewHealthChecker("test")
+	hc := New("test")
 	hc.SetConfig(Config{Interval: time.Second})
 	hc.SetChecker(func(context.Context, string) bool { return true })
 	hc.OnChanged(func(_ string, online bool) {
