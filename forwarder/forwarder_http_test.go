@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -31,22 +30,14 @@ import (
 
 func testHandler(key string) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintln(rw, key)
+		rw.WriteHeader(201)
+		fmt.Fprint(rw, key)
 	})
 }
 
 func TestLoadBalancer(t *testing.T) {
-	ep1 := httpep.Config{
-		Host:   "127.0.0.1",
-		Port:   8101,
-		Weight: 1,
-	}.NewEndpoint()
-
-	ep2 := httpep.Config{
-		Host:   "127.0.0.1",
-		Port:   8102,
-		Weight: 2,
-	}.NewEndpoint()
+	ep1 := httpep.Config{Host: "127.0.0.1", Port: 8101, Weight: 1}.NewEndpoint()
+	ep2 := httpep.Config{Host: "127.0.0.1", Port: 8102, Weight: 2}.NewEndpoint()
 
 	discovery := endpoint.NewStatic(loadbalancer.Endpoints{ep1, ep2})
 	forwarder := New("test", retry.New(roundrobin.NewBalancer(""), 0, 0), discovery)
@@ -63,21 +54,44 @@ func TestLoadBalancer(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 100)
 
-	rec := httptest.NewRecorder()
+	var results []string
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
+
+	rec := httptest.NewRecorder()
 	forwarder.ServeHTTP(rec, req)
+	results = append(results, rec.Body.String())
+	if rec.Code != 201 {
+		t.Errorf("expect status code 201, but got %d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
 	forwarder.ServeHTTP(rec, req)
+	results = append(results, rec.Body.String())
+	if rec.Code != 201 {
+		t.Errorf("expect status code 201, but got %d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
 	forwarder.ServeHTTP(rec, req)
+	results = append(results, rec.Body.String())
+	if rec.Code != 201 {
+		t.Errorf("expect status code 201, but got %d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
 	forwarder.ServeHTTP(rec, req)
+	results = append(results, rec.Body.String())
+	if rec.Code != 201 {
+		t.Errorf("expect status code 201, but got %d", rec.Code)
+	}
 
 	expects := []string{
 		"8101",
 		"8102",
 		"8101",
 		"8102",
-		"",
 	}
-	results := strings.Split(rec.Body.String(), "\n")
+
 	if len(expects) != len(results) {
 		t.Errorf("expect %d lines, but got %d: %v", len(expects), len(results), results)
 	} else {

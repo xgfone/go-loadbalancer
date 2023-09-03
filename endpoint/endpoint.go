@@ -45,7 +45,7 @@ func New(id string, serve loadbalancer.ServeFunc) *Endpoint {
 	if serve == nil {
 		serve = noop
 	}
-	e := &Endpoint{id: id, serve: noop}
+	e := &Endpoint{id: id, serve: serve}
 	e.SetWeight(1)
 	return e
 }
