@@ -45,7 +45,7 @@ func TestBalancer(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1:80", nil)
 	for i := 0; i < 8; i++ {
-		_, err := balancer.Forward(context.TODO(), req, discovery)
+		_, err := balancer.Forward(context.Background(), req, discovery)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -62,7 +62,8 @@ func (m *BuilderManager) AllDirectives() []string {
 	return directives
 }
 
-// Build is a convenient function to build a new directive for directive.
+// Build is a convenient function to build a new processor
+// by the directive and arguments.
 func (m *BuilderManager) Build(directive string, args ...any) (processor Processor, err error) {
 	if builder := m.Get(directive); builder == nil {
 		err = fmt.Errorf("no the processor builder for the directive '%s'", directive)

@@ -143,7 +143,7 @@ func (hc *HealthChecker) OnChanged(cb func(id string, online bool)) {
 	hc.updater.Store(cb)
 }
 
-// SetChecker set the check function to intercept the health checking.  TODO:
+// SetChecker set the check function to intercept the health checking.
 func (hc *HealthChecker) SetChecker(f func(ctx context.Context, id string) bool) {
 	hc.checker.Store(f)
 }
