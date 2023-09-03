@@ -14,6 +14,7 @@ $ go get -u github.com/xgfone/go-loadbalancer
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"net/http"
@@ -29,12 +30,8 @@ var listenAddr = flag.String("listenaddr", ":80", "The address that api gateway 
 
 func main() {
 	flag.Parse()
-
-	healthcheck.DefaultHealthChecker.Start()
-	defer healthcheck.DefaultHealthChecker.Stop()
-
 	http.HandleFunc("/admin/route", registerRouteHandler)
-	http.ListenAndServe(*listenAddr, nil)
+	_ = http.ListenAndServe(*listenAddr, nil)
 }
 
 func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
@@ -50,8 +47,8 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Upstream Endpoints
 		Upstream struct {
-			ForwardPolicy string              `json:"forwardPolicy" default:"weight_random"`
-			HealthCheck   healthcheck.Checker `json:"healthCheck"`
+			ForwardPolicy string             `json:"forwardPolicy" default:"weight_random"`
+			HealthCheck   healthcheck.Config `json:"healthCheck"`
 			Servers       []struct {
 				Host   string `json:"host" validate:"host"`
 				Port   uint16 `json:"port" validate:"ranger(1,65535)"`
@@ -67,21 +64,35 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build the upstream backend servers.
-	endpoints := make(endpoint.Endpoints, len(req.Upstream.Servers))
-	for i, server := range req.Upstream.Servers {
-		endpoints[i] = httpep.Config{
-			Host:   server.Host,
-			Port:   server.Port,
-			Weight: server.Weight,
-		}.NewEndpoint()
+	manager := endpoint.NewManager(len(req.Upstream.Servers))
+	for _, server := range req.Upstream.Servers {
+		ep := httpep.Config{Host: server.Host, Port: server.Port, Weight: server.Weight}.NewEndpoint()
+		manager.Add(ep)
 	}
 
 	// Build the loadbalancer forwarder.
 	balancer, _ := balancer.Build(req.Upstream.ForwardPolicy, nil)
-	forwarder := forwarder.NewForwarder(req.Method+"@"+req.Path, balancer)
+	forwarder := forwarder.New(req.Method+"@"+req.Path, balancer, manager)
 
-	healthcheck.DefaultHealthChecker.AddUpdater(forwarder.Name(), forwarder)
-	healthcheck.DefaultHealthChecker.UpsertEndpoints(endpoints, req.Upstream.HealthCheck)
+	// Build the healthcheck
+	checker := healthcheck.New(forwarder.Name())
+	checker.OnChanged(manager.SetOnline)
+	checker.SetChecker(func(ctx context.Context, id string) bool {
+		resp, err := http.Get("http://" + id)
+		if resp != nil {
+			resp.Body.Close()
+		}
+		if err != nil {
+			return false
+		}
+		return resp.StatusCode >= 200 && resp.StatusCode < 300
+	})
+
+	for ep := range manager.All() {
+		checker.AddTarget(ep.ID())
+	}
+	go checker.Start()
+	// checker.Stop()
 
 	// Register the route and forward the request to forwarder.
 	http.HandleFunc(req.Path, func(w http.ResponseWriter, r *http.Request) {
@@ -108,8 +119,8 @@ $ curl -XPOST http://127.0.0.1/admin/route -H 'Content-Type: application/json' -
     "upstream": {
         "forwardPolicy": "weight_round_robin",
         "servers": [
-            {"ip": "192.168.1.11", "port": 80, "weight": 10}, // 33.3% requests
-            {"ip": "192.168.1.12", "port": 80, "weight": 20}  // 66.7% requests
+            {"host": "192.168.1.11", "port": 80, "weight": 10}, // 33.3% requests
+            {"host": "192.168.1.12", "port": 80, "weight": 20}  // 66.7% requests
         ]
     }
 }'
