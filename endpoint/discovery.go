@@ -39,3 +39,8 @@ func (s *Static) Discover() *Static { return s }
 
 // Len returns the number of the endpoints.
 func (s *Static) Len() int { return len(s.Endpoints) }
+
+// Append appends the endpoints.
+func (s *Static) Append(eps ...loadbalancer.Endpoint) {
+	s.Endpoints = append(s.Endpoints, eps...)
+}
