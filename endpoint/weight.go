@@ -26,7 +26,7 @@ type Weighter interface {
 
 // GetWeight returns the weight of the endpoint if it has implements
 // the interface Weighter. Or, check whether it has implemented
-// the interface loadbalancer.Unwrapper and unwrap it.
+// the interface Unwrapper and unwrap it.
 // If still failing, return 1 instead.
 func GetWeight(ep loadbalancer.Endpoint) int {
 	switch s := ep.(type) {
@@ -36,7 +36,7 @@ func GetWeight(ep loadbalancer.Endpoint) int {
 		}
 		return 1
 
-	case loadbalancer.Unwrapper:
+	case Unwrapper:
 		return GetWeight(s.Unwrap())
 
 	default:

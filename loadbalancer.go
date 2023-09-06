@@ -14,3 +14,13 @@
 
 // Package loadbalancer provides some common functions.
 package loadbalancer
+
+import "context"
+
+// ServeFunc is the endpoint serve function.
+type ServeFunc func(ctx context.Context, req any) (resp any, err error)
+
+// LoadBalancer is a load balancer to serve the request.
+type LoadBalancer interface {
+	Serve(ctx context.Context, req any) (resp any, err error)
+}

@@ -24,6 +24,11 @@ import (
 	"github.com/xgfone/go-loadbalancer"
 )
 
+// Unwrapper is used to unwrap the inner endpoint.
+type Unwrapper interface {
+	Unwrap() loadbalancer.Endpoint
+}
+
 // Endpoint is a common endpoint implementation.
 type Endpoint struct {
 	id    string
