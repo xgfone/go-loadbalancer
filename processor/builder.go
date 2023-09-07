@@ -19,26 +19,26 @@ import "fmt"
 // Builder is used to build a processor by the directive and arguments.
 type Builder func(directive string, args ...any) (Processor, error)
 
-// BuilderManager is used to manage a set of the processor builders.
-type BuilderManager struct {
+// Registry is used to collect a set of the processor builders.
+type Registry struct {
 	builders map[string]Builder
 }
 
-// DefalutBuilderManager is the default global builder manager.
-var DefalutBuilderManager = NewBuilderManager()
+// DefalutRegistry is the default global builder registry.
+var DefalutRegistry = NewRegistry()
 
-// NewBuilderManager returns a new processor builder manager.
-func NewBuilderManager() *BuilderManager {
-	return &BuilderManager{builders: make(map[string]Builder, 32)}
+// NewRegistry returns a new processor builder manager.
+func NewRegistry() *Registry {
+	return &Registry{builders: make(map[string]Builder, 32)}
 }
 
 // Reset clears all the registered processor builders.
-func (m *BuilderManager) Reset() { clear(m.builders) }
+func (m *Registry) Reset() { clear(m.builders) }
 
 // Register registers the processor builder with the directive.
 //
-// If the directive has existed, override it.
-func (m *BuilderManager) Register(directive string, builder Builder) {
+// If exists, override it.
+func (m *Registry) Register(directive string, builder Builder) {
 	if directive == "" {
 		panic("processor directive must not be empty")
 	}
@@ -48,13 +48,20 @@ func (m *BuilderManager) Register(directive string, builder Builder) {
 	m.builders[directive] = builder
 }
 
+// Unregister unregisters the processor builder by the directive.
+//
+// If not exist, do nothing.
+func (m *Registry) Unregister(directive string) {
+	delete(m.builders, directive)
+}
+
 // Get returns the registered processor builder by the directive.
 //
-// If the directive does not exist, return nil.
-func (m *BuilderManager) Get(directive string) Builder { return m.builders[directive] }
+// If not exist, return nil.
+func (m *Registry) Get(directive string) Builder { return m.builders[directive] }
 
-// AllDirectives returns the directives of all the processor builders.
-func (m *BuilderManager) AllDirectives() []string {
+// Directives returns the directives of all the registered processor builders.
+func (m *Registry) Directives() []string {
 	directives := make([]string, 0, len(m.builders))
 	for directive := range m.builders {
 		directives = append(directives, directive)
@@ -64,11 +71,11 @@ func (m *BuilderManager) AllDirectives() []string {
 
 // Build is a convenient function to build a new processor
 // by the directive and arguments.
-func (m *BuilderManager) Build(directive string, args ...any) (processor Processor, err error) {
+func (m *Registry) Build(directive string, args ...any) (processor Processor, err error) {
 	if builder := m.Get(directive); builder == nil {
-		err = fmt.Errorf("no the processor builder for the directive '%s'", directive)
+		err = fmt.Errorf("not found processor builder for directive '%s'", directive)
 	} else if processor, err = builder(directive, args...); err == nil && processor == nil {
-		panic(fmt.Errorf("processor builder for the directive '%s' returns a nil", directive))
+		panic(fmt.Errorf("got a nil from processor builder for directive '%s'", directive))
 	}
 	return
 }

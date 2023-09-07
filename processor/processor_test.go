@@ -19,11 +19,30 @@ import (
 	"testing"
 )
 
-func nothing(_ context.Context, _ Context) error { return nil }
-
 func TestCompactProcessors(t *testing.T) {
-	processors := CompactProcessors(nil, None(), ProcessorFunc(nothing))
-	if _len := len(processors); _len != 1 {
-		t.Errorf("expect %d processor, but got %d", 1, _len)
+	processors := CompactProcessors(
+		nil,
+		None(),
+
+		NoError(func(_ context.Context, i interface{}) {
+			v := i.(*int)
+			*v = *v + 1
+		}),
+
+		ProcessorFunc(func(_ context.Context, i interface{}) error {
+			v := i.(*int)
+			*v = *v + 2
+			return nil
+		}),
+	)
+	if _len := len(processors); _len != 2 {
+		t.Errorf("expect %d processor, but got %d", 2, _len)
+	}
+
+	var v int
+	if err := processors.Process(context.Background(), &v); err != nil {
+		t.Error(err)
+	} else if v != 3 {
+		t.Errorf("expect %d, but got %d", 3, v)
 	}
 }

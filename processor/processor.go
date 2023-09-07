@@ -15,10 +15,7 @@
 // Package processor provides some common request and response processors.
 package processor
 
-import (
-	"context"
-	"net/http"
-)
+import "context"
 
 var (
 	_ Processor = ProcessorFunc(nil)
@@ -26,99 +23,45 @@ var (
 )
 
 type (
-	// Context represents a processor context.
-	Context struct {
-		CtxData any
-
-		SrcRes http.ResponseWriter
-		SrcReq *http.Request
-		DstReq *http.Request
-	}
-
 	// Processor is used to process the request or response.
 	Processor interface {
-		Process(context.Context, Context) error
+		Process(ctx context.Context, data interface{}) error
 	}
 
 	// ProcessorFunc is the processor function.
-	ProcessorFunc func(ctx context.Context, pc Context) error
+	ProcessorFunc func(ctx context.Context, data interface{}) error
 
 	// Processors represents a group of processors.
 	Processors []Processor
 )
 
-// WithContext returns a new processor Context with the context data.
-func (c Context) WithContext(ctxData any) Context {
-	c.CtxData = ctxData
-	return c
-}
-
-// WithSrcRes returns a new processor Context with the http response writer as SrcRes.
-func (c Context) WithSrcRes(rw http.ResponseWriter) Context {
-	c.SrcRes = rw
-	return c
-}
-
-// WithSrcReq returns a new processor Context with the http request as SrcReq.
-func (c Context) WithSrcReq(req *http.Request) Context {
-	c.SrcReq = req
-	return c
-}
-
-// WithDstReq returns a new processor Context with the http request as DstReq.
-func (c Context) WithDstReq(req *http.Request) Context {
-	c.DstReq = req
-	return c
-}
-
 // Process implements the interface Processor.
 //
 // f may be nil, which is equal to do nothing and return nil.
-func (f ProcessorFunc) Process(ctx context.Context, pc Context) error {
+func (f ProcessorFunc) Process(ctx context.Context, data interface{}) error {
 	if f == nil {
 		return nil
 	}
-	return f(ctx, pc)
+	return f(ctx, data)
 }
 
 // Process implements the interface Processor.
-func (ps Processors) Process(ctx context.Context, pc Context) (err error) {
+func (ps Processors) Process(ctx context.Context, data interface{}) (err error) {
 	for i, _len := 0, len(ps); i < _len; i++ {
-		if err = ps[i].Process(ctx, pc); err != nil {
+		if err = ps[i].Process(ctx, data); err != nil {
 			return
 		}
 	}
 	return
 }
 
-// NewContext returns a new Context.
-func NewContext(srcres http.ResponseWriter, srcreq, dstreq *http.Request) Context {
-	return Context{SrcRes: srcres, SrcReq: srcreq, DstReq: dstreq}
-}
-
 // None is equal to ProcessorFunc(nil).
 func None() Processor { return ProcessorFunc(nil) }
 
 // NoError converts a function without return to a processor.
-func NoError(f func(ctx context.Context, pc Context)) Processor {
-	return ProcessorFunc(func(ctx context.Context, pc Context) error {
-		f(ctx, pc)
-		return nil
-	})
-}
-
-// Request is a convenient function to return a simple request processor.
-func Request(f func(*http.Request)) Processor {
-	return ProcessorFunc(func(ctx context.Context, pc Context) error {
-		f(pc.DstReq)
-		return nil
-	})
-}
-
-// Response is a convenient function to return a simple response processor.
-func Response(f func(http.ResponseWriter)) Processor {
-	return ProcessorFunc(func(_ context.Context, pc Context) error {
-		f(pc.SrcRes)
+func NoError(f func(context.Context, interface{})) Processor {
+	return ProcessorFunc(func(ctx context.Context, data interface{}) error {
+		f(ctx, data)
 		return nil
 	})
 }
