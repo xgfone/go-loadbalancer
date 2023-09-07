@@ -115,10 +115,13 @@ func (e *Endpoint) Weight() int { return int(atomic.LoadInt32(&e.weight)) }
 
 // SetWeight resets the weight of the endpoint, which is thread-safe.
 //
-// NOTICE: weight must be a positive integer.
+// NOTICE: weight must be equal to or greater than 0. If 0, use 1 instead.
 func (e *Endpoint) SetWeight(weight int) {
-	if weight <= 0 {
-		panic("Endpoint.SetWeight: weight must be a positive integer")
+	switch {
+	case weight < 0:
+		panic("Endpoint.SetWeight: weight must not be a negative integer")
+	case weight == 0:
+		weight = 1
 	}
 	atomic.StoreInt32(&e.weight, int32(weight))
 }
