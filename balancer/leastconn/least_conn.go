@@ -21,7 +21,6 @@ import (
 	"sync"
 
 	"github.com/xgfone/go-loadbalancer"
-	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
 // Concurrenter is used to return the concurrent number of an endpoint.
@@ -63,8 +62,8 @@ func NewBalancer(policy string, getconcurrency func(loadbalancer.Endpoint) int) 
 func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *Balancer) Forward(c context.Context, r any, sd endpoint.Discovery) (any, error) {
-	switch eps := sd.Discover(); len(eps.Endpoints) {
+func (b *Balancer) Forward(c context.Context, r any, eps *loadbalancer.Static) (any, error) {
+	switch len(eps.Endpoints) {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
@@ -77,11 +76,11 @@ func (b *Balancer) Forward(c context.Context, r any, sd endpoint.Discovery) (any
 func (b *Balancer) selectEndpoint(eps loadbalancer.Endpoints) loadbalancer.Endpoint {
 	b.lock.Lock()
 	defer b.lock.Unlock()
-	w := endpoint.Acquire(len(eps))
+	w := loadbalancer.Acquire(len(eps))
 	w.Endpoints = append(w.Endpoints, eps...)
 	b.sort(w.Endpoints)
 	ep := w.Endpoints[0]
-	endpoint.Release(w)
+	loadbalancer.Release(w)
 	return ep
 }
 

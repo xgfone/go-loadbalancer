@@ -78,7 +78,7 @@ func (f *Forwarder) ForwardHTTP(ctx context.Context, w http.ResponseWriter,
 
 	// 2. Process the request.
 	if reqProcessor != nil {
-		err := reqProcessor.Process(ctx, processor.NewContext(w, r, req))
+		err := reqProcessor.Process(ctx, req)
 		if err != nil {
 			return nil, err
 		}

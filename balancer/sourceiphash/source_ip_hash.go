@@ -23,7 +23,6 @@ import (
 
 	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
-	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
 var random = rand.Intn
@@ -56,8 +55,7 @@ func NewBalancer(policy string) *Balancer {
 func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *Balancer) Forward(c context.Context, r any, sd endpoint.Discovery) (any, error) {
-	eps := sd.Discover()
+func (b *Balancer) Forward(c context.Context, r any, eps *loadbalancer.Static) (any, error) {
 	_len := len(eps.Endpoints)
 	switch _len {
 	case 0:

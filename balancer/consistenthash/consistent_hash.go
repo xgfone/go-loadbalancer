@@ -19,7 +19,6 @@ import (
 	"context"
 
 	"github.com/xgfone/go-loadbalancer"
-	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
 // Balancer implements the balancer based on the consistent hash.
@@ -44,8 +43,7 @@ func NewBalancer(policy string, hash func(req any) int) *Balancer {
 func (b *Balancer) Policy() string { return b.policy }
 
 // Forward forwards the request to one of the backend endpoints.
-func (b *Balancer) Forward(c context.Context, r any, sd endpoint.Discovery) (any, error) {
-	eps := sd.Discover()
+func (b *Balancer) Forward(c context.Context, r any, eps *loadbalancer.Static) (any, error) {
 	switch _len := len(eps.Endpoints); _len {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints

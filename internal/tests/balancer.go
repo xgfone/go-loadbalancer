@@ -20,11 +20,10 @@ import (
 	"testing"
 
 	"github.com/xgfone/go-loadbalancer"
-	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
 type forwarder interface {
-	Forward(context.Context, any, endpoint.Discovery) (any, error)
+	Forward(context.Context, any, *loadbalancer.Static) (any, error)
 }
 
 // BenchBalancer benchmarks the forwarder.
@@ -40,8 +39,8 @@ func BenchBalancer(b *testing.B, forwarder forwarder) {
 		NewNoopEndpoint("127.0.0.8", 8),
 	}
 
-	discovery := endpoint.NewStatic(eps)
-	endpoint.Release(endpoint.Acquire(len(eps)))
+	discovery := loadbalancer.NewStatic(eps)
+	loadbalancer.Release(loadbalancer.Acquire(len(eps)))
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
 	req.RemoteAddr = "127.0.0.1"
 

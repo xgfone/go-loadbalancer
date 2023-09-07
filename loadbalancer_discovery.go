@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package endpoint
-
-import "github.com/xgfone/go-loadbalancer"
+package loadbalancer
 
 // Discovery is used to discover the endpoints.
 type Discovery interface {
@@ -22,7 +20,7 @@ type Discovery interface {
 }
 
 // Static is used to wrap a set of endpoints.
-type Static struct{ loadbalancer.Endpoints }
+type Static struct{ Endpoints }
 
 var _ Discovery = new(Static)
 
@@ -30,9 +28,7 @@ var _ Discovery = new(Static)
 var None = new(Static)
 
 // NewStatic returns a new static with the endpoints.
-func NewStatic(eps loadbalancer.Endpoints) *Static {
-	return &Static{Endpoints: eps}
-}
+func NewStatic(eps Endpoints) *Static { return &Static{Endpoints: eps} }
 
 // Discover returns itself, which implements the interface Discovery.
 func (s *Static) Discover() *Static { return s }
@@ -41,6 +37,12 @@ func (s *Static) Discover() *Static { return s }
 func (s *Static) Len() int { return len(s.Endpoints) }
 
 // Append appends the endpoints.
-func (s *Static) Append(eps ...loadbalancer.Endpoint) {
+func (s *Static) Append(eps ...Endpoint) {
 	s.Endpoints = append(s.Endpoints, eps...)
 }
+
+// Discover implements the interface Discovery,
+// which is just used to test in general.
+func (eps Endpoints) Discover() *Static { return &Static{Endpoints: eps} }
+
+var _ Discovery = Endpoints(nil)

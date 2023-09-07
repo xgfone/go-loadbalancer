@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/xgfone/go-loadbalancer"
-	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
@@ -33,7 +32,7 @@ func TestSourceIPHash(t *testing.T) {
 	ep2 := tests.NewNoopEndpoint("127.0.0.2", 2)
 	ep3 := tests.NewNoopEndpoint("127.0.0.3", 3)
 	eps := loadbalancer.Endpoints{ep1, ep2, ep3}
-	discovery := endpoint.NewStatic(eps)
+	discovery := loadbalancer.NewStatic(eps)
 
 	req1, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
 	req2, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)

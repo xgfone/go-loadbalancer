@@ -12,21 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package endpoint
+package loadbalancer
 
-import (
-	"sync"
-
-	"github.com/xgfone/go-loadbalancer"
-)
+import "sync"
 
 var (
-	eppool4   = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 4)} }}
-	eppool8   = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 8)} }}
-	eppool16  = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 16)} }}
-	eppool32  = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 32)} }}
-	eppool64  = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 64)} }}
-	eppool128 = sync.Pool{New: func() any { return &Static{make(loadbalancer.Endpoints, 0, 128)} }}
+	eppool4   = sync.Pool{New: func() any { return NewStatic(make(Endpoints, 0, 4)) }}
+	eppool8   = sync.Pool{New: func() any { return NewStatic(make(Endpoints, 0, 8)) }}
+	eppool16  = sync.Pool{New: func() any { return NewStatic(make(Endpoints, 0, 16)) }}
+	eppool32  = sync.Pool{New: func() any { return NewStatic(make(Endpoints, 0, 32)) }}
+	eppool64  = sync.Pool{New: func() any { return NewStatic(make(Endpoints, 0, 64)) }}
+	eppool128 = sync.Pool{New: func() any { return NewStatic(make(Endpoints, 0, 128)) }}
 )
 
 // Acquire acquires a preallocated zero-length endpoints from the pool.

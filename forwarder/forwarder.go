@@ -23,7 +23,6 @@ import (
 	"github.com/xgfone/go-atomicvalue"
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer"
-	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
 // Forwarder is used to forward the request to one of the backend endpoints.
@@ -31,11 +30,11 @@ type Forwarder struct {
 	name      string
 	timeout   int64
 	balancer  atomicvalue.Value[balancer.Balancer]
-	discovery atomicvalue.Value[endpoint.Discovery]
+	discovery atomicvalue.Value[loadbalancer.Discovery]
 }
 
 // New returns a new Forwarder to forward the request.
-func New(name string, b balancer.Balancer, d endpoint.Discovery) *Forwarder {
+func New(name string, b balancer.Balancer, d loadbalancer.Discovery) *Forwarder {
 	if b == nil {
 		b = balancer.DefaultBalancer
 	}
@@ -86,12 +85,12 @@ func (f *Forwarder) SwapBalancer(new balancer.Balancer) (old balancer.Balancer) 
 }
 
 // GetDiscovery returns the endpoint discovery.
-func (f *Forwarder) GetDiscovery() endpoint.Discovery {
+func (f *Forwarder) GetDiscovery() loadbalancer.Discovery {
 	return f.discovery.Load()
 }
 
 // SetDiscovery sets the endpoint discovery to discover the endpoints.
-func (f *Forwarder) SetDiscovery(d endpoint.Discovery) {
+func (f *Forwarder) SetDiscovery(d loadbalancer.Discovery) {
 	if d == nil {
 		panic("Forwarder.SetDiscovery: endpoint discovery must not be nil")
 	}
@@ -99,7 +98,7 @@ func (f *Forwarder) SetDiscovery(d endpoint.Discovery) {
 }
 
 // SwapDiscovery swaps the old endpoint discovery with the new.
-func (f *Forwarder) SwapDiscovery(new endpoint.Discovery) (old endpoint.Discovery) {
+func (f *Forwarder) SwapDiscovery(new loadbalancer.Discovery) (old loadbalancer.Discovery) {
 	if new == nil {
 		panic("Forwarder.SwapDiscovery: endpoint discovery must not be nil")
 	}
@@ -109,8 +108,8 @@ func (f *Forwarder) SwapDiscovery(new endpoint.Discovery) (old endpoint.Discover
 // Serve implement the interface endpoint.Endpoint#Serve,
 // which will forward the request to one of the backend endpoints.
 func (f *Forwarder) Serve(ctx context.Context, req any) (any, error) {
-	ed := f.GetDiscovery()
-	if ed.Discover().Len() <= 0 {
+	eps := f.Discover()
+	if eps.Len() <= 0 {
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	}
 
@@ -120,15 +119,15 @@ func (f *Forwarder) Serve(ctx context.Context, req any) (any, error) {
 		defer cancel()
 	}
 
-	return f.GetBalancer().Forward(ctx, req, ed)
+	return f.GetBalancer().Forward(ctx, req, eps)
 }
 
 var _ loadbalancer.LoadBalancer = new(Forwarder)
 
 // ------------------------------------------------------------------------ //
 
-var _ endpoint.Discovery = new(Forwarder)
+var _ loadbalancer.Discovery = new(Forwarder)
 
 // Discover return all the online endpoints,
 // which implements the inerface endpoint.Discovery#Discover
-func (f *Forwarder) Discover() *endpoint.Static { return f.GetDiscovery().Discover() }
+func (f *Forwarder) Discover() *loadbalancer.Static { return f.GetDiscovery().Discover() }

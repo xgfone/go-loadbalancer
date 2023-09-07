@@ -41,7 +41,7 @@ func (w *epwrapper) SetEndpoint(ep loadbalancer.Endpoint) { w.ep.Store(ep) }
 type Manager struct {
 	lock   sync.RWMutex
 	alleps map[string]*epwrapper
-	oneps  atomicvalue.Value[*Static]
+	oneps  atomicvalue.Value[*loadbalancer.Static]
 }
 
 // NewManager returns a new endpoint manager.
@@ -49,14 +49,14 @@ type Manager struct {
 // NOTICE: For the added endpoint, it should be comparable.
 func NewManager(initcap int) *Manager {
 	m := &Manager{alleps: make(map[string]*epwrapper, initcap)}
-	m.oneps.Store(None)
+	m.oneps.Store(loadbalancer.None)
 	return m
 }
 
-var _ Discovery = new(Manager)
+var _ loadbalancer.Discovery = new(Manager)
 
 // Discover returns all the online endpoints, which implements the interface Discovery.
-func (m *Manager) Discover() *Static { return m.oneps.Load() }
+func (m *Manager) Discover() *loadbalancer.Static { return m.oneps.Load() }
 
 // All returns all the endpoints with the online status.
 func (m *Manager) All() map[loadbalancer.Endpoint]bool {
@@ -288,9 +288,9 @@ func (m *Manager) SetAllOnline(online bool) {
 }
 
 func (m *Manager) updateEndpoints() {
-	oneps := None
+	oneps := loadbalancer.None
 	if len(m.alleps) > 0 {
-		oneps = Acquire(len(m.alleps))
+		oneps = loadbalancer.Acquire(len(m.alleps))
 		for _, w := range m.alleps {
 			if w.Online() {
 				oneps.Endpoints = append(oneps.Endpoints, w.Endpoint())
@@ -298,5 +298,5 @@ func (m *Manager) updateEndpoints() {
 		}
 		Sort(oneps.Endpoints)
 	}
-	Release(m.oneps.Swap(oneps))
+	loadbalancer.Release(m.oneps.Swap(oneps))
 }

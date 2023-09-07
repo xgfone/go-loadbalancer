@@ -33,7 +33,7 @@ func TestBalancer(t *testing.T) {
 		tests.NewNoopEndpoint("5.6.7.8:8000", 1),
 		tests.NewNoopEndpoint("5.6.7.8:8080", 1),
 	}
-	discovery := endpoint.NewStatic(eps)
+	discovery := loadbalancer.NewStatic(eps)
 
 	balancer := NewBalancer("chash_ip", func(req any) int {
 		ip, _, err := net.SplitHostPort(req.(*http.Request).URL.Host)
