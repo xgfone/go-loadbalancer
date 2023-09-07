@@ -21,7 +21,8 @@ import (
 	"net/http"
 
 	"github.com/xgfone/go-loadbalancer"
-	"github.com/xgfone/go-loadbalancer/http/processor"
+	"github.com/xgfone/go-loadbalancer/httpx"
+	"github.com/xgfone/go-loadbalancer/processor"
 )
 
 type timeoutError interface {
@@ -43,7 +44,7 @@ func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if resp != nil { // Success
 			resp := resp.(*http.Response)
 			defer resp.Body.Close()
-			_ = processor.HandleResponse(w, resp, nil)
+			_ = httpx.HandleResponse(w, resp, nil)
 		}
 
 	case err == loadbalancer.ErrNoAvailableEndpoints:

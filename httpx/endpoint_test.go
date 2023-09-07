@@ -12,4 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package endpoint
+package httpx
+
+import "testing"
+
+func TestEndpoint(t *testing.T) {
+	config := Config{Host: "127.0.0.1", Port: 8100}
+	ep := config.NewEndpoint()
+
+	if ep.ID() != config.ID() {
+		t.Errorf("expect endpoint id '%s', but got '%s'", config.ID(), ep.ID())
+	}
+}

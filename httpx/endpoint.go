@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package endpoint provides a backend endpoint based on the stdlib
-// "net/http".
-//
-// NOTICE: THIS IS ONLY A SIMPLE EXAMPLE, AND YOU MAYBE IMPLEMENT YOURSELF.
-package endpoint
+package httpx
 
 import (
 	"context"
@@ -39,7 +35,7 @@ func (c Config) ID() string {
 	return net.JoinHostPort(c.Host, strconv.FormatUint(uint64(c.Port), 10))
 }
 
-// NewEndpoint returns a new endpoint.
+// NewEndpoint returns a new simple endpoint.
 //
 // For the argument request, it may be one of types:
 //

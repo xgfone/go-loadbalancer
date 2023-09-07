@@ -24,7 +24,7 @@ import (
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer/retry"
 	"github.com/xgfone/go-loadbalancer/balancer/roundrobin"
-	httpep "github.com/xgfone/go-loadbalancer/http/endpoint"
+	"github.com/xgfone/go-loadbalancer/httpx"
 )
 
 func testHandler(key string) http.Handler {
@@ -35,8 +35,8 @@ func testHandler(key string) http.Handler {
 }
 
 func TestLoadBalancer(t *testing.T) {
-	ep1 := httpep.Config{Host: "127.0.0.1", Port: 8101, Weight: 1}.NewEndpoint()
-	ep2 := httpep.Config{Host: "127.0.0.1", Port: 8102, Weight: 2}.NewEndpoint()
+	ep1 := httpx.Config{Host: "127.0.0.1", Port: 8101, Weight: 1}.NewEndpoint()
+	ep2 := httpx.Config{Host: "127.0.0.1", Port: 8102, Weight: 2}.NewEndpoint()
 
 	discovery := loadbalancer.NewStatic(loadbalancer.Endpoints{ep1, ep2})
 	forwarder := New("test", retry.New(roundrobin.NewBalancer(""), 0, 0), discovery)
