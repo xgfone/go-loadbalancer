@@ -34,10 +34,10 @@ type Balancer struct {
 // NewBalancer returns a new balancer based on the roundrobin
 // with the policy name.
 //
-// If policy is empty, use "round_robin" instead.
+// If policy is empty, use "roundrobin" instead.
 func NewBalancer(policy string) *Balancer {
 	if policy == "" {
-		policy = "round_robin"
+		policy = "roundrobin"
 	}
 	return &Balancer{policy: policy, last: math.MaxUint64}
 }
@@ -71,10 +71,10 @@ type WeightedBalancer struct {
 // NewWeightedBalancer returns a new balancer based on the weighted roundrobin
 // with the policy name.
 //
-// If policy is empty, use "weight_round_robin" instead.
+// If policy is empty, use "weight_roundrobin" instead.
 func NewWeightedBalancer(policy string) *WeightedBalancer {
 	if policy == "" {
-		policy = "weight_round_robin"
+		policy = "weight_roundrobin"
 	}
 
 	return &WeightedBalancer{

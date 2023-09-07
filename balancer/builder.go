@@ -15,82 +15,66 @@
 package balancer
 
 import (
-	"fmt"
-
 	"github.com/xgfone/go-loadbalancer/balancer/leastconn"
 	"github.com/xgfone/go-loadbalancer/balancer/random"
 	"github.com/xgfone/go-loadbalancer/balancer/roundrobin"
 	"github.com/xgfone/go-loadbalancer/balancer/sourceiphash"
 )
 
-var builders = make(map[string]Builder, 8)
+var balancers = make(map[string]Balancer, 8)
 
 func init() {
-	RegisterBalancer(random.NewBalancer(""))
-	RegisterBalancer(random.NewWeightedBalancer(""))
-	RegisterBalancer(roundrobin.NewBalancer(""))
-	RegisterBalancer(roundrobin.NewWeightedBalancer(""))
-	RegisterBalancer(sourceiphash.NewBalancer(""))
-	RegisterBalancer(leastconn.NewBalancer("", nil))
+	Register(random.NewBalancer(""))
+	Register(random.NewWeightedBalancer(""))
+	Register(roundrobin.NewBalancer(""))
+	Register(roundrobin.NewWeightedBalancer(""))
+	Register(sourceiphash.NewBalancer(""))
+	Register(leastconn.NewBalancer("", nil))
 }
 
-// Builder is used to build a new Balancer with the config.
-type Builder func(policy string, config any) (Balancer, error)
-
-// RegisterBuidler registers the balancer builder for the given policy.
+// Register registers the balancer.
 //
-// If the balancer builder for policy has existed, override it to the new.
-func RegisterBuidler(policy string, builder Builder) {
-	if builder == nil {
-		panic("balancer builder must not be nil")
-	}
-	builders[policy] = builder
-}
-
-// RegisterBalancer uses the balancer itself as the builder to register.
-//
-// For builtin balancers as following, they have been registered automatically,
-// which will ignore any builder config and never return an error.
+// Some balancers has been registered by default, as follow:
 //
 //	random
-//	round_robin
+//	roundrobin
 //	weight_random
-//	weight_round_robin
-//	source_ip_hash
-//	least_conn
-func RegisterBalancer(b Balancer) {
-	RegisterBuidler(b.Policy(), func(string, any) (Balancer, error) { return b, nil })
+//	weight_roundrobin
+//	sourceip_hash
+//	leastconn
+//
+// If exists, override it.
+func Register(balancer Balancer) {
+	if balancer == nil {
+		panic("Register: balancer must not be nil")
+	}
+	balancers[balancer.Policy()] = balancer
 }
 
-// GetBuilder returns the registered balancer builder by the policy.
+// Unregister unregisters the balancer by the policy.
 //
-// If the balancer builder for policy does not exist, return nil.
-func GetBuilder(policy string) Builder { return builders[policy] }
+// If not exist, do nothing.
+func Unregister(policy string) { delete(balancers, policy) }
 
-// GetAllPolicies returns the policies of all the balancer builders.
-func GetAllPolicies() []string {
-	policies := make([]string, 0, len(builders))
-	for policy := range builders {
+// Get returns the registered balancer by the policy.
+//
+// If not exist, return nil.
+func Get(policy string) Balancer { return balancers[policy] }
+
+// Gets returns all the registered balancers.
+func Gets() []Balancer {
+	_balancers := make([]Balancer, 0, len(balancers))
+	for _, balancer := range balancers {
+		_balancers = append(_balancers, balancer)
+	}
+	return _balancers
+}
+
+// Policies returns the policies of all the registered balancers.
+func Policies() []string {
+	policies := make([]string, 0, len(balancers))
+	for policy := range balancers {
 		policies = append(policies, policy)
 	}
 	return policies
-}
-
-// Build is a convenient function to build a new balancer for policy.
-func Build(policy string, config any) (balancer Balancer, err error) {
-	if builder := GetBuilder(policy); builder == nil {
-		err = fmt.Errorf("no the balancer builder for the policy '%s'", policy)
-	} else if balancer, err = builder(policy, config); err == nil && balancer == nil {
-		panic(fmt.Errorf("balancer builder for the policy '%s' returns a nil", policy))
-	}
-	return
-}
-
-// Must is equal to Build, but panics if there is an error.
-func Must(policy string, config any) (balancer Balancer) {
-	balancer, err := Build(policy, config)
-	if err != nil {
-		panic(err)
-	}
-	return
 }

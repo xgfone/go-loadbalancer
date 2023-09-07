@@ -44,10 +44,10 @@ type Balancer struct {
 // NewBalancer returns a new balancer based on the source-ip hash
 // with the policy name.
 //
-// If policy is empty, use "source_ip_hash" instead.
+// If policy is empty, use "sourceip_hash" instead.
 func NewBalancer(policy string) *Balancer {
 	if policy == "" {
-		policy = "source_ip_hash"
+		policy = "sourceip_hash"
 	}
 	return &Balancer{policy: policy}
 }

@@ -50,11 +50,11 @@ type Balancer struct {
 
 // NewBalancer returns a new balancer based on the random with the policy name.
 //
-// If policy is empty, use "least_conn" instead.
+// If policy is empty, use "leastconn" instead.
 // If getconcurrency is nil, use GetConcurrency instead.
 func NewBalancer(policy string, getconcurrency func(loadbalancer.Endpoint) int) *Balancer {
 	if policy == "" {
-		policy = "least_conn"
+		policy = "leastconn"
 	}
 	return &Balancer{policy: policy, getcon: getconcurrency}
 }

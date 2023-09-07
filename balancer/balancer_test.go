@@ -14,23 +14,46 @@
 
 package balancer
 
-import "testing"
+import (
+	"slices"
+	"testing"
+
+	"github.com/xgfone/go-loadbalancer/balancer/consistenthash"
+)
 
 func TestRegisteredBuiltinBuidler(t *testing.T) {
+	Register(consistenthash.NewBalancer("hash_url", func(req any) int { return 0 }))
+
 	expects := []string{
 		"random",
-		"round_robin",
+		"roundrobin",
 		"weight_random",
-		"weight_round_robin",
-		"source_ip_hash",
-		"least_conn",
+		"weight_roundrobin",
+		"sourceip_hash",
+		"leastconn",
+		"hash_url",
 	}
 
-	for _, typ := range expects {
-		if _, err := Build(typ, nil); err != nil {
-			t.Error(err)
-		} else if _, err := Build(typ, nil); err != nil {
-			t.Error(err)
+	for _, s := range expects {
+		if Get(s) == nil {
+			t.Errorf("not found balancer '%s'", s)
 		}
+	}
+
+	for _, b := range Gets() {
+		if !slices.Contains(expects, b.Policy()) {
+			t.Errorf("%s is not in %v", b.Policy(), expects)
+		}
+	}
+
+	for _, s := range Policies() {
+		if !slices.Contains(expects, s) {
+			t.Errorf("%s is not in %v", s, expects)
+		}
+	}
+
+	Unregister("hash_url")
+	if slices.Contains(Policies(), "hash_url") {
+		t.Errorf("unexpect the balancer for policy 'hash_url'")
 	}
 }
