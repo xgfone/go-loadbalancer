@@ -15,14 +15,12 @@
 package forwarder
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net/http"
 
 	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/httpx"
-	"github.com/xgfone/go-loadbalancer/processor"
 )
 
 type timeoutError interface {
@@ -36,9 +34,10 @@ func isTimeout(err error) bool {
 	return errors.As(err, &timeoutErr) && timeoutErr.Timeout()
 }
 
-// ServeHTTP implements the interface http.Handler.
+// ServeHTTP implements the interface http.Handler,
+// which just forwards the request to one of the backend endpoints.
 func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	resp, err := f.ForwardHTTP(r.Context(), w, r, nil)
+	resp, err := f.forward(w, r)
 	switch {
 	case err == nil:
 		if resp != nil { // Success
@@ -63,11 +62,8 @@ func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ForwardHTTP is the same as Serve, but just a simple implementation for http
-func (f *Forwarder) ForwardHTTP(ctx context.Context, w http.ResponseWriter,
-	r *http.Request, reqProcessor processor.Processor) (any, error) {
-	// 1. Create a new request.
-	req := r.Clone(ctx)
+func (f *Forwarder) forward(w http.ResponseWriter, r *http.Request) (any, error) {
+	req := r.Clone(r.Context())
 	req.Close = false
 	req.URL.User = nil
 	req.Header.Del("Connection")
@@ -76,15 +72,5 @@ func (f *Forwarder) ForwardHTTP(ctx context.Context, w http.ResponseWriter,
 	if req.URL.Scheme == "" {
 		req.URL.Scheme = "http"
 	}
-
-	// 2. Process the request.
-	if reqProcessor != nil {
-		err := reqProcessor.Process(ctx, req)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// 3. Forward the request.
-	return f.Serve(ctx, req)
+	return f.Serve(req.Context(), req)
 }
