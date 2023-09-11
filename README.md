@@ -23,7 +23,7 @@ import (
 	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/forwarder"
 	"github.com/xgfone/go-loadbalancer/healthcheck"
-	httpep "github.com/xgfone/go-loadbalancer/http/endpoint"
+	"github.com/xgfone/go-loadbalancer/httpx"
 )
 
 var listenAddr = flag.String("listenaddr", ":80", "The address that api gateway listens on.")
@@ -66,12 +66,12 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 	// Build the upstream backend servers.
 	manager := endpoint.NewManager(len(req.Upstream.Servers))
 	for _, server := range req.Upstream.Servers {
-		ep := httpep.Config{Host: server.Host, Port: server.Port, Weight: server.Weight}.NewEndpoint()
+		ep := httpx.Config{Host: server.Host, Port: server.Port, Weight: server.Weight}.NewEndpoint()
 		manager.Add(ep)
 	}
 
 	// Build the loadbalancer forwarder.
-	balancer, _ := balancer.Build(req.Upstream.ForwardPolicy, nil)
+	balancer := balancer.Get(req.Upstream.ForwardPolicy) // not check it is nil
 	forwarder := forwarder.New(req.Method+"@"+req.Path, balancer, manager)
 
 	// Build the healthcheck
@@ -88,7 +88,7 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 		return resp.StatusCode >= 200 && resp.StatusCode < 300
 	})
 
-	for ep := range manager.All() {
+	for _, ep := range manager.All() {
 		checker.AddTarget(ep.ID())
 	}
 	go checker.Start()
