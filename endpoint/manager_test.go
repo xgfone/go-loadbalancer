@@ -73,7 +73,7 @@ func TestManager(t *testing.T) {
 		t.Errorf("expect online endpoint '%s', but got '%s'", "1.2.3.6", id)
 	}
 
-	if ep, online := m.Get("1.2.3.7"); ep == nil {
+	if ep, online := m.GetWithOnline("1.2.3.7"); ep == nil {
 		t.Error("execpt an endpoint, but got none")
 	} else if online {
 		t.Error("expec an offline endpoint, but got online")

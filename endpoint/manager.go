@@ -58,8 +58,19 @@ var _ loadbalancer.Discovery = new(Manager)
 // Discover returns all the online endpoints, which implements the interface Discovery.
 func (m *Manager) Discover() *loadbalancer.Static { return m.oneps.Load() }
 
-// All returns all the endpoints with the online status.
-func (m *Manager) All() map[loadbalancer.Endpoint]bool {
+// All returns all the endpoints.
+func (m *Manager) All() loadbalancer.Endpoints {
+	m.lock.RLock()
+	eps := make(loadbalancer.Endpoints, 0, len(m.alleps))
+	for _, w := range m.alleps {
+		eps = append(eps, w.Endpoint())
+	}
+	m.lock.RUnlock()
+	return eps
+}
+
+// AllWithOnline returns all the endpoints with the online status.
+func (m *Manager) AllWithOnline() map[loadbalancer.Endpoint]bool {
 	m.lock.RLock()
 	eps := make(map[loadbalancer.Endpoint]bool, len(m.alleps))
 	for _, w := range m.alleps {
@@ -91,8 +102,21 @@ func (m *Manager) Len() int {
 
 // Get returns the endpoint by the id.
 //
+// If not exist, return nil.
+func (m *Manager) Get(epid string) (ep loadbalancer.Endpoint) {
+	m.lock.RLock()
+	w := m.alleps[epid]
+	m.lock.RUnlock()
+	if w != nil {
+		ep = w.Endpoint()
+	}
+	return
+}
+
+// GetWithOnline returns the endpoint and the online status by the id.
+//
 // If not exist, return (nil, false).
-func (m *Manager) Get(epid string) (ep loadbalancer.Endpoint, online bool) {
+func (m *Manager) GetWithOnline(epid string) (ep loadbalancer.Endpoint, online bool) {
 	m.lock.RLock()
 	w := m.alleps[epid]
 	m.lock.RUnlock()
@@ -244,6 +268,20 @@ func (m *Manager) Clear() {
 		m.updateEndpoints()
 	}
 	m.lock.Unlock()
+}
+
+// IsOnline reports whether the endpoint is online by the id.
+//
+// If not exist, return false.
+func (m *Manager) IsOnline(epid string) (online bool) {
+	m.lock.RLock()
+	w := m.alleps[epid]
+	m.lock.RUnlock()
+
+	if w != nil {
+		online = w.Online()
+	}
+	return
 }
 
 // SetOnline sets the online status of the endpoint.
