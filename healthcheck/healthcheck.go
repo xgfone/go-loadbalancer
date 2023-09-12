@@ -165,6 +165,14 @@ func (hc *HealthChecker) Config() Config {
 	return hc.cconfig.Load().Config
 }
 
+// Started reports whether the health checker has been started.
+func (hc *HealthChecker) Started() bool {
+	hc.lock.Lock()
+	started := hc.cancel != nil
+	hc.lock.Unlock()
+	return started
+}
+
 // Start starts the health checker.
 func (hc *HealthChecker) Start() {
 	hc.lock.Lock()
