@@ -17,10 +17,15 @@ package loadbalancer
 
 import "context"
 
-// ServeFunc is the endpoint serve function.
-type ServeFunc func(ctx context.Context, req any) (resp any, err error)
-
 // LoadBalancer is a load balancer to serve the request.
 type LoadBalancer interface {
 	Serve(ctx context.Context, req any) (resp any, err error)
+}
+
+// ServeFunc is the loadbalancer serve function.
+type ServeFunc func(ctx context.Context, req any) (resp any, err error)
+
+// Serve implements the interface LoadBalancer.
+func (f ServeFunc) Serve(ctx context.Context, req any) (any, error) {
+	return f(ctx, req)
 }
