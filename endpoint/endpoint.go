@@ -31,13 +31,13 @@ type Unwrapper interface {
 
 // Endpoint is a common endpoint implementation.
 type Endpoint struct {
-	id    string
-	serve loadbalancer.ServeFunc
+	id string
 
 	total  uint64
 	concur int32
 	weight int32
 	config atomicvalue.Value[any]
+	serve  atomicvalue.Value[loadbalancer.ServeFunc]
 }
 
 // New returns a new common endpoint with the id and serve function.
@@ -50,21 +50,25 @@ func New(id string, serve loadbalancer.ServeFunc) *Endpoint {
 	if serve == nil {
 		serve = noop
 	}
-	e := &Endpoint{id: id, serve: serve}
+	e := &Endpoint{id: id}
+	e.SetServeFunc(serve)
 	e.SetWeight(1)
 	return e
 }
 
 func noop(context.Context, any) (any, error) { return nil, nil }
 
-// SetServe is used to delay to set the serve function of the endpoint.
-//
-// NOTICE: it is not thread-safe, so should be called before using it.
-func (e *Endpoint) SetServe(serve loadbalancer.ServeFunc) {
+// SetServeFunc resets the serve function of the endpoint.
+func (e *Endpoint) SetServeFunc(serve loadbalancer.ServeFunc) {
 	if serve == nil {
 		panic("Endpoint.SetServe: serve function must not be nil")
 	}
-	e.serve = serve
+	e.serve.Store(serve)
+}
+
+// ServeFunc returns the serve function.
+func (e *Endpoint) ServeFunc() loadbalancer.ServeFunc {
+	return e.serve.Load()
 }
 
 // Serve returns the endpoint id, which implements the interface loadbalancer.Endpoint#ID.
@@ -77,7 +81,7 @@ func (e *Endpoint) String() string { return e.id }
 func (e *Endpoint) Serve(c context.Context, r any) (any, error) {
 	e.inc()
 	defer e.dec()
-	return e.serve(c, r)
+	return e.serve.Load()(c, r)
 }
 
 func (e *Endpoint) inc() {
