@@ -29,6 +29,11 @@ type Unwrapper interface {
 	Unwrap() loadbalancer.Endpoint
 }
 
+// Updater is used to try to update the endpoint from another src.
+type Updater interface {
+	Update(src loadbalancer.Endpoint) (success bool)
+}
+
 // Endpoint is a common endpoint implementation.
 type Endpoint struct {
 	id string
@@ -110,6 +115,19 @@ func (e *Endpoint) Config() any { return e.config.Load() }
 //
 // NOTICE: it's thread-safe.
 func (e *Endpoint) SetConfig(c any) { e.config.Store(c) }
+
+// Update tries to update itself to src.
+func (e *Endpoint) Update(src loadbalancer.Endpoint) bool {
+	_src, ok := src.(*Endpoint)
+	if !ok || _src.id != e.id {
+		return false
+	}
+
+	e.SetConfig(_src.Config())
+	e.SetWeight(_src.Weight())
+	e.SetServeFunc(_src.ServeFunc())
+	return true
+}
 
 // Weight returns the weight of the endpoint,
 // which implements the interface Weighter.
