@@ -14,15 +14,13 @@ $ go get -u github.com/xgfone/go-loadbalancer
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"net/http"
 
+	"github.com/xgfone/go-loadbalancer"
 	"github.com/xgfone/go-loadbalancer/balancer"
-	"github.com/xgfone/go-loadbalancer/endpoint"
 	"github.com/xgfone/go-loadbalancer/forwarder"
-	"github.com/xgfone/go-loadbalancer/healthcheck"
 	"github.com/xgfone/go-loadbalancer/httpx"
 )
 
@@ -47,8 +45,7 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Upstream Endpoints
 		Upstream struct {
-			ForwardPolicy string             `json:"forwardPolicy" default:"weight_random"`
-			HealthCheck   healthcheck.Config `json:"healthCheck"`
+			ForwardPolicy string `json:"forwardPolicy" default:"weight_random"`
 			Servers       []struct {
 				Host   string `json:"host" validate:"host"`
 				Port   uint16 `json:"port" validate:"ranger(1,65535)"`
@@ -64,35 +61,15 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build the upstream backend servers.
-	manager := endpoint.NewManager(len(req.Upstream.Servers))
+	static := loadbalancer.Acquire(len(req.Upstream.Servers))
 	for _, server := range req.Upstream.Servers {
-		ep := httpx.Config{Host: server.Host, Port: server.Port, Weight: server.Weight}.NewEndpoint()
-		manager.Add(ep)
+		c := httpx.Config{Host: server.Host, Port: server.Port, Weight: server.Weight}
+		static.Append(c.NewEndpoint())
 	}
 
 	// Build the loadbalancer forwarder.
 	balancer := balancer.Get(req.Upstream.ForwardPolicy) // not check it is nil
-	forwarder := forwarder.New(req.Method+"@"+req.Path, balancer, manager)
-
-	// Build the healthcheck
-	checker := healthcheck.New(forwarder.Name())
-	checker.OnChanged(manager.SetOnline)
-	checker.SetChecker(func(ctx context.Context, id string) bool {
-		resp, err := http.Get("http://" + id)
-		if resp != nil {
-			resp.Body.Close()
-		}
-		if err != nil {
-			return false
-		}
-		return resp.StatusCode >= 200 && resp.StatusCode < 300
-	})
-
-	for _, ep := range manager.All() {
-		checker.AddTarget(ep.ID())
-	}
-	go checker.Start()
-	// checker.Stop()
+	forwarder := forwarder.New(req.Method+"@"+req.Path, balancer, static)
 
 	// Register the route and forward the request to forwarder.
 	http.HandleFunc(req.Path, func(w http.ResponseWriter, r *http.Request) {
