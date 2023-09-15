@@ -19,6 +19,12 @@ type Discovery interface {
 	Discover() *Static
 }
 
+// DiscoveryFunc is a discovery function.
+type DiscoveryFunc func() *Static
+
+// Discover implements the interface Discovery.
+func (f DiscoveryFunc) Discover() *Static { return f() }
+
 // Static is used to wrap a set of endpoints.
 type Static struct{ Endpoints }
 

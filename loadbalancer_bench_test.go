@@ -31,8 +31,7 @@ type dofunc func(*Static)
 func (f dofunc) Do(s *Static) { f(s) }
 
 func BenchmarkEndpointsDiscovery(b *testing.B) {
-	var do doer
-	do = dofunc(func(s *Static) {})
+	var do doer = dofunc(func(s *Static) {})
 
 	eps := Endpoints{noneep("ep1"), noneep("ep2"), noneep("ep3")}
 
@@ -46,8 +45,7 @@ func BenchmarkEndpointsDiscovery(b *testing.B) {
 }
 
 func BenchmarkStaticDiscovery(b *testing.B) {
-	var do doer
-	do = dofunc(func(s *Static) {})
+	var do doer = dofunc(func(s *Static) {})
 
 	s := NewStatic(Endpoints{noneep("ep1"), noneep("ep2"), noneep("ep3")})
 
