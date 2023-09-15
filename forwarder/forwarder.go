@@ -31,6 +31,7 @@ type Forwarder struct {
 	timeout   int64
 	balancer  atomicvalue.Value[balancer.Balancer]
 	discovery atomicvalue.Value[loadbalancer.Discovery]
+	config    atomicvalue.Value[interface{}]
 }
 
 // New returns a new Forwarder to forward the request.
@@ -48,11 +49,28 @@ func New(name string, b balancer.Balancer, d loadbalancer.Discovery) *Forwarder 
 	return f
 }
 
-// Name reutrns the name of the forwarder.
+// Name returns the name of the forwarder.
 func (f *Forwarder) Name() string { return f.name }
 
-// Type reutrns the type of the forwarder, that's "loadbalancer".
+// Type returns the type of the forwarder, that's "loadbalancer".
 func (f *Forwarder) Type() string { return "loadbalancer" }
+
+// String returns the description of the forwarder, which is equal to f.Name().
+func (f *Forwarder) String() string { return f.name }
+
+// Config is the alias of GetConfig.
+func (f *Forwarder) Config() interface{} { return f.config.Load() }
+
+// GetConfig returns the configuration information attached to the forwarder.
+func (f *Forwarder) GetConfig() interface{} { return f.config.Load() }
+
+// SetConfig sets the configuration information attached to the forwarder.
+func (f *Forwarder) SetConfig(config interface{}) { f.config.Store(config) }
+
+// Timeout is the alias of GetTimeout.
+func (f *Forwarder) Timeout() time.Duration {
+	return time.Duration(atomic.LoadInt64(&f.timeout))
+}
 
 // GetTimeout returns the maximum timeout.
 func (f *Forwarder) GetTimeout() time.Duration {
@@ -63,6 +81,9 @@ func (f *Forwarder) GetTimeout() time.Duration {
 func (f *Forwarder) SetTimeout(timeout time.Duration) {
 	atomic.StoreInt64(&f.timeout, int64(timeout))
 }
+
+// Balancer is the alias of GetBalancer.
+func (f *Forwarder) Balancer() balancer.Balancer { return f.balancer.Load() }
 
 // GetBalancer returns the balancer.
 func (f *Forwarder) GetBalancer() balancer.Balancer {
@@ -83,6 +104,9 @@ func (f *Forwarder) SwapBalancer(new balancer.Balancer) (old balancer.Balancer) 
 	}
 	return f.balancer.Swap(new)
 }
+
+// Discovery is the alias of GetDiscovery.
+func (f *Forwarder) Discovery() loadbalancer.Discovery { return f.discovery.Load() }
 
 // GetDiscovery returns the endpoint discovery.
 func (f *Forwarder) GetDiscovery() loadbalancer.Discovery {
