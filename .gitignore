@@ -46,3 +46,5 @@ debug_test
 # hidden files
 .*
 _*
+
+cmd/
