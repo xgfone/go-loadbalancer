@@ -146,11 +146,10 @@ func (f *Forwarder) Serve(ctx context.Context, req any) (any, error) {
 	return f.GetBalancer().Forward(ctx, req, eps)
 }
 
-var _ loadbalancer.LoadBalancer = new(Forwarder)
-
-// ------------------------------------------------------------------------ //
-
-var _ loadbalancer.Discovery = new(Forwarder)
+var (
+	_ loadbalancer.LoadBalancer = new(Forwarder)
+	_ loadbalancer.Discovery    = new(Forwarder)
+)
 
 // Discover return all the online endpoints,
 // which implements the inerface endpoint.Discovery#Discover
