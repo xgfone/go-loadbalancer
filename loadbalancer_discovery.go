@@ -19,6 +19,8 @@ type Discovery interface {
 	Discover() *Static
 }
 
+var _ Discovery = DiscoveryFunc(nil)
+
 // DiscoveryFunc is a discovery function.
 type DiscoveryFunc func() *Static
 
