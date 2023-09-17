@@ -61,7 +61,7 @@ func registerRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build the upstream backend servers.
-	static := loadbalancer.Acquire(len(req.Upstream.Servers))
+	static := loadbalancer.NewStaticWithCap(len(req.Upstream.Servers))
 	for _, server := range req.Upstream.Servers {
 		c := httpx.Config{Host: server.Host, Port: server.Port, Weight: server.Weight}
 		static.Append(c.NewEndpoint())

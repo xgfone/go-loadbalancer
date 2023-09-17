@@ -38,6 +38,9 @@ var None = new(Static)
 // NewStatic returns a new static with the endpoints.
 func NewStatic(eps Endpoints) *Static { return &Static{Endpoints: eps} }
 
+// NewStaticWithCap returns a new static with the 0-len and n-cap endpoints.
+func NewStaticWithCap(n int) *Static { return NewStatic(make(Endpoints, 0, n)) }
+
 // Discover returns itself, which implements the interface Discovery.
 func (s *Static) Discover() *Static { return s }
 
