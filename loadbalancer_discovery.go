@@ -14,6 +14,8 @@
 
 package loadbalancer
 
+import "sync/atomic"
+
 // Discovery is used to discover the endpoints.
 type Discovery interface {
 	Discover() *Static
@@ -57,3 +59,32 @@ func (s *Static) Append(eps ...Endpoint) {
 func (eps Endpoints) Discover() *Static { return &Static{Endpoints: eps} }
 
 var _ Discovery = Endpoints(nil)
+
+var _ Discovery = new(AtomicStatic)
+
+// AtomicStatic is a atomic static discovery.
+type AtomicStatic struct {
+	static atomic.Pointer[Static]
+}
+
+// NewAtomicStatic a new atomic static.
+func NewAtomicStatic(static *Static) *AtomicStatic {
+	s := new(AtomicStatic)
+	s.Set(static)
+	return s
+}
+
+// Discover implements the interface Discovery.
+func (s *AtomicStatic) Discover() *Static {
+	return s.static.Load()
+}
+
+// Swap swap the old static with the new.
+func (s *AtomicStatic) Swap(new *Static) (old *Static) {
+	return s.static.Swap(new)
+}
+
+// Set sets the static to new.
+func (s *AtomicStatic) Set(new *Static) {
+	s.static.Store(new)
+}
