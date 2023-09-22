@@ -16,8 +16,9 @@
 package endpoint
 
 import (
+	"cmp"
 	"context"
-	"sort"
+	"slices"
 	"sync/atomic"
 
 	"github.com/xgfone/go-atomicvalue"
@@ -150,20 +151,23 @@ func (e *Endpoint) SetWeight(weight int) {
 
 var _ Weighter = new(Endpoint)
 
-// SortEndpoints sorts the endpoints by the ASC order..
+func init() { loadbalancer.SortEndpoints = Sort }
+
+// SortEndpoints sorts the endpoints by the ASC order.
 func Sort(eps loadbalancer.Endpoints) {
 	if len(eps) == 0 {
 		return
 	}
 
-	sort.SliceStable(eps, func(i, j int) bool {
-		iw, jw := GetWeight(eps[i]), GetWeight(eps[j])
-		if iw < jw {
-			return true
-		} else if iw == jw {
-			return eps[i].ID() < eps[j].ID()
-		} else {
-			return false
+	slices.SortStableFunc(eps, func(a, b loadbalancer.Endpoint) int {
+		aw, bw := GetWeight(a), GetWeight(b)
+		switch {
+		case aw < bw:
+			return -1
+		case aw > bw:
+			return 1
+		default:
+			return cmp.Compare(a.ID(), b.ID())
 		}
 	})
 }

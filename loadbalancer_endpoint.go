@@ -14,6 +14,16 @@
 
 package loadbalancer
 
+import (
+	"cmp"
+	"slices"
+)
+
+// SortEndpoints is used to sort a set of the endpoints.
+//
+// For the default implementation, sort them by the id from small to big.
+var SortEndpoints func(Endpoints) = sortEndpoints
+
 // Endpoint represents a backend endpoint.
 type Endpoint interface {
 	LoadBalancer
@@ -34,4 +44,10 @@ func (eps Endpoints) Contains(epid string) bool {
 		}
 	}
 	return false
+}
+
+func sortEndpoints(eps Endpoints) {
+	slices.SortStableFunc(eps, func(a, b Endpoint) int {
+		return cmp.Compare(a.ID(), b.ID())
+	})
 }
