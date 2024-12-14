@@ -37,9 +37,9 @@ func TestSourceIPHash(t *testing.T) {
 	req1, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
 	req2, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
 	req3, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1", nil)
-	req1.RemoteAddr = "192.168.0.0"
-	req2.RemoteAddr = "192.168.0.1"
-	req3.RemoteAddr = "192.168.0.2"
+	req1.RemoteAddr = "192.168.0.0:80"
+	req2.RemoteAddr = "192.168.0.1:80"
+	req3.RemoteAddr = "192.168.0.2:80"
 
 	balancer := NewBalancer("")
 	_, _ = balancer.Forward(context.Background(), req1, discovery)
