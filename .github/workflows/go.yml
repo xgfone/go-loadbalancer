@@ -1,8 +1,5 @@
 name: Go
 on: push
-env:
-  GO111MODULE: on
-  GOPATH: /home/runner/go
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,11 +7,13 @@ jobs:
     strategy:
       matrix:
         go:
-        - '1.21.x'
+          - "1.21"
+          - "1.22"
+          - "1.23"
     steps:
-    - uses: actions/checkout@v3
-    - name: Setup Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ matrix.go }}
-    - run: go test -cover -race ./...
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go test -cover -race ./...
