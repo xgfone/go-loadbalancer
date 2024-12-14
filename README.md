@@ -1,8 +1,14 @@
-# Go LoadBalancer [![Build Status](https://github.com/xgfone/go-loadbalancer/actions/workflows/go.yml/badge.svg)](https://github.com/xgfone/go-loadbalancer/actions/workflows/go.yml) [![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/go-loadbalancer)](https://pkg.go.dev/github.com/xgfone/go-loadbalancer) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/go-loadbalancer/master/LICENSE)
+# Go LoadBalancer
+
+[![Build Status](https://github.com/xgfone/go-loadbalancer/actions/workflows/go.yml/badge.svg)](https://github.com/xgfone/go-loadbalancer/actions/workflows/go.yml)
+[![GoDoc](https://pkg.go.dev/badge/github.com/xgfone/go-loadbalancer)](https://pkg.go.dev/github.com/xgfone/go-loadbalancer)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xgfone/go-loadbalancer/master/LICENSE)
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/tag/xgfone/go-loadbalancer?sort=semver)
 
 Require Go `1.21+`.
 
 ## Install
+
 ```shell
 $ go get -u github.com/xgfone/go-loadbalancer
 ```
@@ -10,6 +16,7 @@ $ go get -u github.com/xgfone/go-loadbalancer
 ## Example
 
 ### Mini API Gateway
+
 ```go
 package main
 
