@@ -18,10 +18,13 @@ package sourceiphash
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
+	"log/slog"
 	"math/rand"
+	"net"
+	"net/http"
 	"net/netip"
 
-	"github.com/xgfone/go-defaults"
 	"github.com/xgfone/go-loadbalancer"
 )
 
@@ -29,6 +32,37 @@ var random = rand.Intn
 
 // GetSourceIP is the default function to get the source ip of the request.
 var GetSourceIP func(ctx context.Context, req any) (netip.Addr, error)
+
+func getsourceip(_ context.Context, req any) (addr netip.Addr) {
+	switch v := req.(type) {
+	case interface{ RemoteAddr() netip.Addr }:
+		return v.RemoteAddr()
+
+	case interface{ RemoteAddr() string }:
+		return parseaddr(v.RemoteAddr())
+
+	case *http.Request:
+		return parseaddr(v.RemoteAddr)
+
+	default:
+		panic(fmt.Errorf("unknown request %T", req))
+	}
+}
+
+func parseaddr(s string) (addr netip.Addr) {
+	host, _, err := net.SplitHostPort(s)
+	if err != nil {
+		slog.Error("fail to split hostport", "addr", s, "err", err)
+		return
+	}
+
+	addr, err = netip.ParseAddr(host)
+	if err != nil {
+		slog.Error("fail to parse ip", "ip", host, "err", err)
+	}
+
+	return
+}
 
 // Balancer implements the balancer based on the source-ip hash.
 type Balancer struct {
@@ -72,7 +106,7 @@ func (b *Balancer) Forward(c context.Context, r any, eps *loadbalancer.Static) (
 	case GetSourceIP != nil:
 		sip, err = GetSourceIP(c, r)
 	default:
-		sip = defaults.GetClientIP(c, r)
+		sip = getsourceip(c, r)
 	}
 
 	if err != nil {

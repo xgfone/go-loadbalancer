@@ -62,7 +62,7 @@ func (f *Forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (f *Forwarder) forward(w http.ResponseWriter, r *http.Request) (any, error) {
+func (f *Forwarder) forward(_ http.ResponseWriter, r *http.Request) (any, error) {
 	req := r.Clone(r.Context())
 	req.Close = false
 	req.URL.User = nil
