@@ -1,4 +1,4 @@
-// Copyright 2024 xgfone
+// Copyright 2026 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build go1.22
-// +build go1.22
+// Package selector provides a selector interface and builder, which is used to
+// select one of the backend endpoints by the specific policy to handle the request.
+package selector
 
-package sourceiphash
+import (
+	"context"
 
-import "math/rand/v2"
+	"github.com/xgfone/go-loadbalancer"
+)
 
-func init() { random = rand.IntN }
+// Selector is used to select one of the backend endpoints.
+type Selector interface {
+	Select(ctx context.Context, req any, eps *loadbalancer.Static) (loadbalancer.Endpoint, error)
+	Policy() string
+}

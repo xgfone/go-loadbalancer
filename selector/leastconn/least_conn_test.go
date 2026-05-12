@@ -1,4 +1,4 @@
-// Copyright 2023 xgfone
+// Copyright 2026 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 )
 
 func BenchmarkLeastConn(b *testing.B) {
-	tests.BenchBalancer(b, NewBalancer("", nil))
+	tests.BenchSelector(b, NewSelector("", nil))
 }
 
 func TestLeastConn(t *testing.T) {
@@ -33,9 +33,12 @@ func TestLeastConn(t *testing.T) {
 	eps := loadbalancer.Endpoints{ep1, ep2, ep3}
 	discovery := loadbalancer.NewStatic(eps)
 
-	balancer := NewBalancer("", nil)
-	for i := 0; i < 10; i++ {
-		_, _ = balancer.Forward(context.Background(), nil, discovery)
+	selector := NewSelector("", nil)
+	for range 10 {
+		ep, _ := selector.Select(context.Background(), nil, discovery)
+		if ep != nil {
+			_, _ = ep.Serve(context.Background(), nil)
+		}
 	}
 
 	if total := ep1.Total(); total != 10 {

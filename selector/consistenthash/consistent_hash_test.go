@@ -1,4 +1,4 @@
-// Copyright 2023 xgfone
+// Copyright 2026 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 	"github.com/xgfone/go-loadbalancer/internal/tests"
 )
 
-func TestBalancer(t *testing.T) {
+func TestSelector(t *testing.T) {
 	eps := loadbalancer.Endpoints{
 		tests.NewNoopEndpoint("1.2.3.4:8000", 1),
 		tests.NewNoopEndpoint("1.2.3.4:8080", 1),
@@ -35,7 +35,7 @@ func TestBalancer(t *testing.T) {
 	}
 	discovery := loadbalancer.NewStatic(eps)
 
-	balancer := NewBalancer("chash_ip", func(req any) int {
+	selector := NewSelector("chash_ip", func(req any) int {
 		ip, _, err := net.SplitHostPort(req.(*http.Request).URL.Host)
 		if err != nil {
 			panic(err)
@@ -44,16 +44,18 @@ func TestBalancer(t *testing.T) {
 	})
 
 	req, _ := http.NewRequest(http.MethodGet, "http://127.0.0.1:80", nil)
-	for i := 0; i < 8; i++ {
-		_, err := balancer.Forward(context.Background(), req, discovery)
+	for range 8 {
+		ep, err := selector.Select(context.Background(), req, discovery)
 		if err != nil {
 			t.Fatal(err)
+		} else {
+			_, _ = ep.Serve(context.Background(), req)
 		}
 	}
 
 	var num int
 	counts := make([]int, len(eps))
-	for i := 0; i < len(eps); i++ {
+	for i := range len(eps) {
 		total := eps[i].(*endpoint.Endpoint).Total()
 		counts[i] = total
 		if total > 0 {

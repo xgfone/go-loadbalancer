@@ -16,6 +16,7 @@ package loadbalancer
 
 import (
 	"context"
+	"fmt"
 	"testing"
 )
 
@@ -35,5 +36,30 @@ func TestEndpoints(t *testing.T) {
 	}
 	if eps.Contains("id") {
 		t.Errorf("unexpect containing endpoint '%s', but got one", "id")
+	}
+}
+
+func TestEndpointsSort(t *testing.T) {
+	eps := Endpoints{
+		nil,
+		newEndpoint("id1"),
+		nil,
+		newEndpoint("id3"),
+		nil,
+		newEndpoint("id2"),
+		nil,
+	}
+
+	SortEndpoints(eps)
+	for i, ep := range eps {
+		if i < 3 {
+			if ep == nil {
+				t.Errorf("expect endpoint at index %d to be non-nil, but got nil", i)
+			} else if id := fmt.Sprintf("id%d", i+1); id != ep.ID() {
+				t.Errorf("expect endpoint '%s', but got '%s'", id, ep.ID())
+			}
+		} else if ep != nil {
+			t.Errorf("expect endpoint at index %d to be nil, but got non-nil: %s", i, ep.ID())
+		}
 	}
 }

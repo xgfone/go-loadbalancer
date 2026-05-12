@@ -1,4 +1,4 @@
-// Copyright 2024 xgfone
+// Copyright 2026 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build go1.22
-// +build go1.22
-
 package random
 
-import "math/rand/v2"
+import (
+	"testing"
 
-func init() { random = rand.IntN }
+	"github.com/xgfone/go-loadbalancer/internal/tests"
+)
+
+func BenchmarkRandom(b *testing.B) {
+	tests.BenchSelector(b, NewSelector(""))
+}
+
+func BenchmarkWeightedRandom(b *testing.B) {
+	tests.BenchSelector(b, NewWeightedSelector(""))
+}

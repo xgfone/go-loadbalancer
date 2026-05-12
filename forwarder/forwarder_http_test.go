@@ -1,4 +1,4 @@
-// Copyright 2021~2023 xgfone
+// Copyright 2021~2026 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/xgfone/go-loadbalancer"
-	"github.com/xgfone/go-loadbalancer/balancer/retry"
-	"github.com/xgfone/go-loadbalancer/balancer/roundrobin"
+	"github.com/xgfone/go-loadbalancer/balancer"
 	"github.com/xgfone/go-loadbalancer/httpx"
+	"github.com/xgfone/go-loadbalancer/selector/roundrobin"
 )
 
 func testHandler(key string) http.Handler {
@@ -39,7 +39,7 @@ func TestLoadBalancer(t *testing.T) {
 	ep2 := httpx.Config{Host: "127.0.0.1", Port: 8102, Weight: 2}.NewEndpoint()
 
 	discovery := loadbalancer.NewStatic(loadbalancer.Endpoints{ep1, ep2})
-	forwarder := New("test", retry.New(roundrobin.NewBalancer(""), 0, 0), discovery)
+	forwarder := New("test", balancer.NewRetry(roundrobin.NewSelector(""), 0, 0), discovery)
 
 	go func() {
 		server := http.Server{Addr: "127.0.0.1:8101", Handler: testHandler("8101")}

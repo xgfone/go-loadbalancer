@@ -1,4 +1,4 @@
-// Copyright 2021~2023 xgfone
+// Copyright 2021~2026 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,12 +20,14 @@ import (
 	"testing"
 
 	"github.com/xgfone/go-loadbalancer"
-	"github.com/xgfone/go-loadbalancer/balancer/roundrobin"
+	"github.com/xgfone/go-loadbalancer/balancer"
 	"github.com/xgfone/go-loadbalancer/internal/tests"
+	"github.com/xgfone/go-loadbalancer/selector/roundrobin"
 )
 
 func BenchmarkLoadBalancer(b *testing.B) {
-	f := New("test", roundrobin.NewBalancer(""), loadbalancer.NewStatic(loadbalancer.Endpoints{
+	balancer := balancer.NewFromSelector(roundrobin.NewSelector(""))
+	f := New("test", balancer, loadbalancer.NewStatic(loadbalancer.Endpoints{
 		tests.NewNoopEndpoint("127.0.0.1", 1),
 		tests.NewNoopEndpoint("127.0.0.2", 1),
 	}))

@@ -36,18 +36,29 @@ type Endpoints []Endpoint
 // Len return the number of all the endpoints,
 func (eps Endpoints) Len() (n int) { return len(eps) }
 
-// Contains reports whether the endpoints contains the endpoint indicated by the id.
-func (eps Endpoints) Contains(epid string) bool {
-	for _, s := range eps {
+// Index returns the index of the endpoint with the given id, or -1 if not found.
+func (eps Endpoints) Index(epid string) int {
+	for i, s := range eps {
 		if s.ID() == epid {
-			return true
+			return i
 		}
 	}
-	return false
+	return -1
+}
+
+// Contains reports whether the endpoints contains the endpoint indicated by the id.
+func (eps Endpoints) Contains(epid string) bool {
+	return eps.Index(epid) > -1
 }
 
 func sortEndpoints(eps Endpoints) {
 	slices.SortStableFunc(eps, func(a, b Endpoint) int {
+		if b == nil {
+			return -1
+		}
+		if a == nil {
+			return 1
+		}
 		return cmp.Compare(a.ID(), b.ID())
 	})
 }

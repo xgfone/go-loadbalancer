@@ -12,18 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package random
+package tests
 
 import (
+	"context"
 	"testing"
 
-	"github.com/xgfone/go-loadbalancer/internal/tests"
+	"github.com/xgfone/go-loadbalancer"
 )
 
-func BenchmarkRandom(b *testing.B) {
-	tests.BenchBalancer(b, NewBalancer(""))
+type _Selector func(context.Context, any, *loadbalancer.Static) (any, error)
+
+func (f _Selector) Select(context.Context, any, *loadbalancer.Static) (loadbalancer.Endpoint, error) {
+	return nil, nil
 }
 
-func BenchmarkWeightedRandom(b *testing.B) {
-	tests.BenchBalancer(b, NewWeightedBalancer(""))
+func BenchmarkBenchBalancer(b *testing.B) {
+	BenchSelector(b, _Selector(nil))
 }

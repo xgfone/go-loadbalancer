@@ -1,4 +1,4 @@
-// Copyright 2023 xgfone
+// Copyright 2026 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package roundrobin provides a balancer based on the roundrobin.
+// Package roundrobin provides a selector based on the roundrobin.
 package roundrobin
 
 import (
@@ -25,41 +25,41 @@ import (
 	"github.com/xgfone/go-loadbalancer/endpoint"
 )
 
-// Balancer implements the balancer based on the roundrobin policy.
-type Balancer struct {
+// Selector implements the selector based on the roundrobin policy.
+type Selector struct {
 	policy string
 	last   uint64
 }
 
-// NewBalancer returns a new balancer based on the roundrobin
+// NewSelector returns a new Selector based on the roundrobin
 // with the policy name.
 //
 // If policy is empty, use "roundrobin" instead.
-func NewBalancer(policy string) *Balancer {
+func NewSelector(policy string) *Selector {
 	if policy == "" {
 		policy = "roundrobin"
 	}
-	return &Balancer{policy: policy, last: math.MaxUint64}
+	return &Selector{policy: policy, last: math.MaxUint64}
 }
 
-// Policy returns the policy of the balancer.
-func (b *Balancer) Policy() string { return b.policy }
+// Policy returns the policy of the selector.
+func (b *Selector) Policy() string { return b.policy }
 
-// Forward forwards the request to one of the backend endpoints.
-func (b *Balancer) Forward(c context.Context, r any, eps *loadbalancer.Static) (any, error) {
+// Select selects one of the backend endpoints based on the roundrobin policy.
+func (b *Selector) Select(c context.Context, _ any, eps *loadbalancer.Static) (loadbalancer.Endpoint, error) {
 	switch _len := len(eps.Endpoints); _len {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
-		return eps.Endpoints[0].Serve(c, r)
+		return eps.Endpoints[0], nil
 	default:
 		pos := atomic.AddUint64(&b.last, 1)
-		return eps.Endpoints[pos%uint64(_len)].Serve(c, r)
+		return eps.Endpoints[pos%uint64(_len)], nil
 	}
 }
 
-// WeightedBalancer implements the balancer based on the weighted roundrobin.
-type WeightedBalancer struct {
+// WeightedSelector implements the Selector based on the weighted roundrobin.
+type WeightedSelector struct {
 	policy string
 
 	count  int
@@ -67,37 +67,37 @@ type WeightedBalancer struct {
 	lock   sync.Mutex
 }
 
-// NewWeightedBalancer returns a new balancer based on the weighted roundrobin
+// NewWeightedSelector returns a new Selector based on the weighted roundrobin
 // with the policy name.
 //
 // If policy is empty, use "weight_roundrobin" instead.
-func NewWeightedBalancer(policy string) *WeightedBalancer {
+func NewWeightedSelector(policy string) *WeightedSelector {
 	if policy == "" {
 		policy = "weight_roundrobin"
 	}
 
-	return &WeightedBalancer{
+	return &WeightedSelector{
 		policy: policy,
 		caches: make(map[string]*weightedEndpoint, 16),
 	}
 }
 
-// Policy returns the policy of the balancer.
-func (b *WeightedBalancer) Policy() string { return b.policy }
+// Policy returns the policy of the selector.
+func (b *WeightedSelector) Policy() string { return b.policy }
 
-// Forward forwards the request to one of the backend endpoints.
-func (b *WeightedBalancer) Forward(c context.Context, r any, eps *loadbalancer.Static) (any, error) {
+// Select selects one of the backend endpoints based on the weighted roundrobin policy.
+func (b *WeightedSelector) Select(c context.Context, r any, eps *loadbalancer.Static) (loadbalancer.Endpoint, error) {
 	switch len(eps.Endpoints) {
 	case 0:
 		return nil, loadbalancer.ErrNoAvailableEndpoints
 	case 1:
-		return eps.Endpoints[0].Serve(c, r)
+		return eps.Endpoints[0], nil
 	default:
-		return b.selectNextEndpoint(eps.Endpoints).Serve(c, r)
+		return b.selectNextEndpoint(eps.Endpoints), nil
 	}
 }
 
-func (b *WeightedBalancer) selectNextEndpoint(eps loadbalancer.Endpoints) loadbalancer.Endpoint {
+func (b *WeightedSelector) selectNextEndpoint(eps loadbalancer.Endpoints) loadbalancer.Endpoint {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 

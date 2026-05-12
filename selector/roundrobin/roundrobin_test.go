@@ -1,4 +1,4 @@
-// Copyright 2023 xgfone
+// Copyright 2026 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,11 +23,11 @@ import (
 )
 
 func BenchmarkRoundRobin(b *testing.B) {
-	tests.BenchBalancer(b, NewBalancer(""))
+	tests.BenchSelector(b, NewSelector(""))
 }
 
 func BenchmarkWeightedRoundRobin(b *testing.B) {
-	tests.BenchBalancer(b, NewWeightedBalancer(""))
+	tests.BenchSelector(b, NewWeightedSelector(""))
 }
 
 func TestWeightedRoundRobin(t *testing.T) {
@@ -37,9 +37,12 @@ func TestWeightedRoundRobin(t *testing.T) {
 	eps := loadbalancer.Endpoints{ep1, ep2, ep3}
 
 	discovery := loadbalancer.NewStatic(eps)
-	balancer := NewWeightedBalancer("")
-	for i := 0; i < 18; i++ {
-		_, _ = balancer.Forward(context.Background(), nil, discovery)
+	selector := NewWeightedSelector("")
+	for range 18 {
+		ep, _ := selector.Select(context.Background(), nil, discovery)
+		if ep != nil {
+			_, _ = ep.Serve(context.Background(), nil)
+		}
 	}
 
 	if total := ep1.Total(); total != 3 {

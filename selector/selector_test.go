@@ -1,4 +1,4 @@
-// Copyright 2023 xgfone
+// Copyright 2026 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package balancer
+package selector
 
 import (
 	"slices"
 	"testing"
 
-	"github.com/xgfone/go-loadbalancer/balancer/consistenthash"
+	"github.com/xgfone/go-loadbalancer/selector/consistenthash"
 )
 
 func TestRegisteredBuiltinBuidler(t *testing.T) {
-	Register(consistenthash.NewBalancer("hash_url", func(req any) int { return 0 }))
+	selector := consistenthash.NewSelector("hash_url", func(req any) int { return 0 })
+	Register(selector)
 
 	expects := []string{
 		"random",
@@ -36,7 +37,7 @@ func TestRegisteredBuiltinBuidler(t *testing.T) {
 
 	for _, s := range expects {
 		if Get(s) == nil {
-			t.Errorf("not found balancer '%s'", s)
+			t.Errorf("not found selector '%s'", s)
 		}
 	}
 
@@ -54,6 +55,6 @@ func TestRegisteredBuiltinBuidler(t *testing.T) {
 
 	Unregister("hash_url")
 	if slices.Contains(Policies(), "hash_url") {
-		t.Errorf("unexpect the balancer for policy 'hash_url'")
+		t.Errorf("unexpect the selector for policy 'hash_url'")
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright 2023xgfone
+// Copyright 2026 xgfone
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 )
 
 func BenchmarkSourceIPHash(b *testing.B) {
-	tests.BenchBalancer(b, NewBalancer(""))
+	tests.BenchSelector(b, NewSelector(""))
 }
 
 func TestSourceIPHash(t *testing.T) {
@@ -41,15 +41,15 @@ func TestSourceIPHash(t *testing.T) {
 	req2.RemoteAddr = "192.168.0.1:80"
 	req3.RemoteAddr = "192.168.0.2:80"
 
-	balancer := NewBalancer("")
-	_, _ = balancer.Forward(context.Background(), req1, discovery)
-	_, _ = balancer.Forward(context.Background(), req1, discovery)
-	_, _ = balancer.Forward(context.Background(), req1, discovery)
-	_, _ = balancer.Forward(context.Background(), req1, discovery)
-	_, _ = balancer.Forward(context.Background(), req1, discovery)
-	_, _ = balancer.Forward(context.Background(), req1, discovery)
-	_, _ = balancer.Forward(context.Background(), req2, discovery)
-	_, _ = balancer.Forward(context.Background(), req3, discovery)
+	selector := NewSelector("")
+	mustSelect(t, selector, req1, discovery)
+	mustSelect(t, selector, req1, discovery)
+	mustSelect(t, selector, req1, discovery)
+	mustSelect(t, selector, req1, discovery)
+	mustSelect(t, selector, req1, discovery)
+	mustSelect(t, selector, req1, discovery)
+	mustSelect(t, selector, req2, discovery)
+	mustSelect(t, selector, req3, discovery)
 
 	if total := ep1.Total(); total != 6 {
 		t.Errorf("expect %d endpoint1, but got %d", 6, total)
@@ -59,5 +59,14 @@ func TestSourceIPHash(t *testing.T) {
 	}
 	if total := ep3.Total(); total != 1 {
 		t.Errorf("expect %d endpoint3, but got %d", 1, total)
+	}
+}
+
+func mustSelect(t *testing.T, selector *Selector, req *http.Request, discovery *loadbalancer.Static) {
+	ep, err := selector.Select(context.Background(), req, discovery)
+	if err != nil {
+		t.Fatalf("%s: unexpected error: %v", req.RemoteAddr, err)
+	} else {
+		_, _ = ep.Serve(context.Background(), req)
 	}
 }
