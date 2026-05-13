@@ -59,7 +59,7 @@ func (b Retry) Forward(c context.Context, r any, eps *loadbalancer.Static) (resp
 	_eps := eps
 	var ep loadbalancer.Endpoint
 
-	for ; _len > 0 && _eps.Len() > 0; _len-- {
+	for ; _len > 0 && len(_eps.Endpoints) > 0; _len-- {
 		select {
 		case <-c.Done():
 			if err == nil {
@@ -84,7 +84,7 @@ func (b Retry) Forward(c context.Context, r any, eps *loadbalancer.Static) (resp
 		}
 
 		if _eps.Len() <= 1 {
-			return nil, loadbalancer.ErrNoAvailableEndpoints
+			return nil, err
 		}
 
 		if _eps == eps {
@@ -92,7 +92,7 @@ func (b Retry) Forward(c context.Context, r any, eps *loadbalancer.Static) (resp
 		}
 
 		if index := _eps.Index(ep.ID()); index > -1 {
-			_eps.Endpoints[index] = nil
+			_eps.Endpoints = slices.Delete(_eps.Endpoints, index, index+1)
 		}
 
 		if b.Interval > 0 {
