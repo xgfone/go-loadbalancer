@@ -16,10 +16,13 @@ package balancer
 
 import (
 	"context"
+	"errors"
+	"net"
 	"slices"
 	"time"
 
 	"github.com/xgfone/go-loadbalancer"
+	"github.com/xgfone/go-loadbalancer/internal/errorx"
 	"github.com/xgfone/go-loadbalancer/selector"
 )
 
@@ -75,11 +78,7 @@ func (b Retry) Forward(c context.Context, r any, eps *loadbalancer.Static) (resp
 		}
 
 		resp, err = ep.Serve(c, r)
-		if err == nil {
-			return
-		}
-
-		if e, ok := err.(loadbalancer.RetryError); ok && !e.Retry() {
+		if err == nil || !shouldRetry(err) {
 			return
 		}
 
@@ -111,4 +110,20 @@ func (b Retry) Forward(c context.Context, r any, eps *loadbalancer.Static) (resp
 	}
 
 	return
+}
+
+func shouldRetry(err error) bool {
+	if e, ok := errorx.AsType[loadbalancer.RetryError](err); ok {
+		return e.Retry()
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return false
+	}
+
+	if ne, ok := errorx.AsType[net.Error](err); ok && ne.Timeout() {
+		return false
+	}
+
+	return true
 }
